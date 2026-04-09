@@ -1,44 +1,205 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>TURING MACHINE PLAYGROUND</title>
-        <link rel="stylesheet" href="style.css" />
-    </head>
-    <body>
-        <div class="components-pane draggable">
-            <div class="state-button button" mode="state">state</div>
-            <div class="arrow-button button" mode="arrow">arrow</div>
-            <div class="initial-state-button button" mode="initial-state">
-                initialstate
-            </div>
-            <div class="accept-state-button button" mode="accept-state">
-                accept
-            </div>
-            <div class="reject-state-button button" mode="reject-state">
-                reject
-            </div>
-            <div class="hand-button button active-button" mode="grab">grab</div>
-        </div>
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Turing Machine Playground</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
 
-        <div class="canvas">
-            this is the canvas hereeeeeeeeeeeeeeeeeeeeeeeeeee
-        </div>
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="logo">TM<span>playground</span></div>
+  <div class="topbar-sep"></div>
+  <div class="tape-config">
+    <span>Tapes:</span>
+    <input type="number" id="tape-count" value="2" min="1" max="4" style="width:46px"/>
+    <span style="margin-left:8px">Heads/tape:</span>
+    <input type="number" id="head-count" value="1" min="1" max="2" style="width:46px"/>
+    <button class="btn" onclick="applyConfig()">Apply</button>
+  </div>
+  <div class="topbar-sep"></div>
+  <div class="tape-config">
+    <span>Load example:</span>
+    <select id="example-select" onchange="loadExample(this.value)">
+      <option value="">— pick —</option>
+      <option value="copy">Copy (2-tape)</option>
+      <option value="palindrome">Palindrome (2-tape)</option>
+      <option value="increment">Binary +1 (1-tape)</option>
+      <option value="accept_all">Accept All</option>
+    </select>
+  </div>
+  <div class="top-actions">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-text" style="font-size:10px;color:var(--text2)">idle</span>
+    <button class="btn" onclick="toggleDrawer()" id="save-drawer-btn">💾 Saves</button>
+    <button class="btn danger" onclick="resetAll()">Clear All</button>
+  </div>
+</div>
 
-        <div id="transitionModal" class="modal hidden">
-            <div class="modal-box">
-                <h2 display="inline">TRANSITION: </h2> <input id="read-input" class="input-transition read" placeholder="[read]"/> / <input id="write-input" class="write input-transition" placeholder="[write]" />, <input id="move-input" class="move input-transition" placeholder="[move]" />
-                <div class="modal-actions">
-                    <button onclick="submitTransition()" class="ok-btn">
-                        OK
-                    </button>
-                    <button onclick="closeModal()" class="cancel-btn">
-                        Cancel
-                    </button>
-                </div>
-            </div>
+<!-- SAVE/LOAD DRAWER -->
+<div class="save-drawer" id="save-drawer">
+  <div class="drawer-header">
+    <span class="drawer-title">SAVED MACHINES</span>
+    <button class="drawer-close" onclick="toggleDrawer()">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div>
+      <div class="drawer-section-title">Save current machine</div>
+      <div class="save-name-row">
+        <input type="text" id="save-name-input" placeholder="e.g. my_palindrome_v2" maxlength="40"/>
+        <button class="btn accent" onclick="saveMachine()">Save</button>
+      </div>
+    </div>
+    <div class="drawer-divider"></div>
+    <div>
+      <div class="drawer-section-title">Saved machines</div>
+      <div class="saved-list" id="saved-list">
+        <div class="empty-list">No saved machines yet.</div>
+      </div>
+    </div>
+    <div class="drawer-divider"></div>
+    <div>
+      <div class="drawer-section-title">Import / Export JSON</div>
+      <div class="file-io-row">
+        <button class="btn" style="flex:1" onclick="exportJSON()">⬇ Export .json</button>
+        <label class="btn" style="flex:1;text-align:center;cursor:pointer">
+          ⬆ Import .json
+          <input type="file" accept=".json,application/json" onchange="importJSON(event)" style="display:none"/>
+        </label>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-top:8px;line-height:1.6">
+        Export downloads a .json file you can share or back up. Import loads any previously exported file.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- PALETTE -->
+  <div class="palette">
+    <div class="tool active" id="tool-grab" data-tool="grab" onclick="setTool('grab')">
+      ✦<div class="tool-tip">Select / Move</div>
+    </div>
+    <div class="tool-sep"></div>
+    <div class="tool" id="tool-state" data-tool="state" onclick="setTool('state')">
+      ◯<div class="tool-tip">Add State</div>
+    </div>
+    <div class="tool" id="tool-accept" data-tool="accept" onclick="setTool('accept')">
+      ⊙<div class="tool-tip">Accept State</div>
+    </div>
+    <div class="tool" id="tool-reject" data-tool="reject" onclick="setTool('reject')">
+      ✕<div class="tool-tip">Reject State</div>
+    </div>
+    <div class="tool" id="tool-start" data-tool="start" onclick="setTool('start')">
+      ▶<div class="tool-tip">Set Initial State</div>
+    </div>
+    <div class="tool-sep"></div>
+    <div class="tool" id="tool-arrow" data-tool="arrow" onclick="setTool('arrow')">
+      →<div class="tool-tip">Add Transition</div>
+    </div>
+    <div class="tool-sep"></div>
+    <div class="tool" id="tool-delete" data-tool="delete" onclick="setTool('delete')">
+      ⌫<div class="tool-tip">Delete</div>
+    </div>
+  </div>
+
+  <!-- CANVAS -->
+  <div class="canvas-area" id="canvas-area">
+    <svg id="diagram-svg" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow-normal" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0,8 3,0 6" fill="#4f8cff" opacity="0.7"/>
+        </marker>
+        <marker id="arrow-active" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0,8 3,0 6" fill="#4f8cff"/>
+        </marker>
+      </defs>
+      <g id="edges-layer"></g>
+      <g id="states-layer"></g>
+    </svg>
+    <div class="canvas-hint" id="canvas-hint">click canvas with a tool selected to add states</div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <div class="panel-tabs">
+      <div class="panel-tab active" onclick="switchTab('run')" id="tab-run">▶ Run</div>
+      <div class="panel-tab" onclick="switchTab('table')" id="tab-table">⊞ Table</div>
+      <div class="panel-tab" onclick="switchTab('compare')" id="tab-compare">≈ Compare</div>
+    </div>
+
+    <!-- RUN TAB -->
+    <div class="panel-content" id="pane-run">
+      <div class="run-section">
+        <div class="input-row">
+          <label>Input:</label>
+          <input type="text" id="run-input" value="1011" placeholder="tape input"/>
         </div>
-        <script src="main.js"></script>
-    </body>
+        <div class="state-info-row" id="state-info-row">
+          <div class="info-chip">state: <span id="cur-state-display">—</span></div>
+          <div class="info-chip">step: <span id="cur-step-display">0</span></div>
+        </div>
+        <div class="run-controls">
+          <button class="btn accent" onclick="runInit()">⏮ Load</button>
+          <button class="btn" onclick="runStep()">Step →</button>
+          <button class="btn" id="play-btn" onclick="togglePlay()">▶ Play</button>
+          <button class="btn" onclick="runReset()">⟳ Reset</button>
+        </div>
+        <div class="speed-row">
+          <span>Speed:</span>
+          <input type="range" min="1" max="10" value="5" id="speed-range"/>
+        </div>
+      </div>
+
+      <div class="panel-section" id="tapes-section" style="margin-top:16px">
+        <div class="panel-section-title">Tapes</div>
+        <div id="tapes-container"></div>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-section-title">Step Log</div>
+        <div class="step-log" id="step-log"><span style="color:var(--text3)">Load machine and run to see execution log.</span></div>
+      </div>
+    </div>
+
+    <!-- TABLE TAB -->
+    <div class="panel-content" id="pane-table" style="display:none">
+      <div style="margin-bottom:8px;font-size:10px;color:var(--text3)">
+        Editing the table automatically updates the state diagram.
+      </div>
+      <div id="table-container"></div>
+      <button class="add-row-btn" onclick="addTransitionRow()">+ Add Transition</button>
+    </div>
+
+    <!-- COMPARE TAB -->
+    <div class="panel-content" id="pane-compare">
+      <!-- always rendered but tab may be hidden -->
+    </div>
+
+  </div>
+</div>
+
+<!-- TRANSITION MODAL -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-title">Define Transition</div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:14px" id="modal-edge-desc">— → —</div>
+    <div id="modal-tape-inputs"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn accent" onclick="confirmTransition()">Add →</button>
+    </div>
+  </div>
+</div>
+
+<script src="main.js"></script>
+</body>
 </html>
