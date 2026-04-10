@@ -1,0 +1,2297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Turing Machine Playground</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg: #0a0a0f;
+  --bg1: #111118;
+  --bg2: #1a1a24;
+  --bg3: #22222f;
+  --border: #2e2e40;
+  --border2: #3e3e55;
+  --text: #e8e8f0;
+  --text2: #8888aa;
+  --text3: #55556a;
+  --accent: #4f8cff;
+  --accent2: #7c5cfc;
+  --green: #3ddc84;
+  --red: #ff4f6a;
+  --amber: #ffb347;
+  --teal: #3ddccc;
+  --state-normal: #1e2a45;
+  --state-border: #4f8cff;
+  --state-active: #162a42;
+  --state-accept: #0f2a1a;
+  --state-reject: #2a0f16;
+  --state-initial: #1a1a35;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-display: 'Syne', sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font-mono);
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: 48px 1fr;
+  grid-template-columns: 1fr;
+}
+
+/* TOPBAR */
+.topbar {
+  background: var(--bg1);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 20px;
+  z-index: 100;
+}
+.logo {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+.logo span { color: var(--text2); font-weight: 400; }
+.topbar-sep { width: 1px; height: 20px; background: var(--border); }
+.tape-config {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; color: var(--text2);
+}
+.tape-config select, .tape-config input[type=number] {
+  background: var(--bg2); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--font-mono);
+  font-size: 11px; padding: 3px 6px; border-radius: 4px;
+  outline: none;
+}
+.tape-config select:focus, .tape-config input:focus { border-color: var(--accent); }
+.top-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.btn {
+  font-family: var(--font-mono); font-size: 11px;
+  padding: 5px 12px; border-radius: 5px; border: 1px solid var(--border);
+  background: var(--bg2); color: var(--text); cursor: pointer;
+  transition: all 0.15s; letter-spacing: 0.03em;
+}
+.btn:hover { border-color: var(--border2); background: var(--bg3); }
+.btn.accent { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.accent:hover { background: #3a7aef; }
+.btn.danger { border-color: var(--red); color: var(--red); }
+.btn.danger:hover { background: rgba(255,79,106,0.1); }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text3); }
+.status-dot.running { background: var(--green); animation: pulse 1s infinite; }
+.status-dot.accepted { background: var(--green); }
+.status-dot.rejected { background: var(--red); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+/* MAIN LAYOUT */
+.main {
+  display: grid;
+  grid-template-columns: 52px 1fr 360px;
+  overflow: hidden;
+}
+
+/* TOOL PALETTE */
+.palette {
+  background: var(--bg1);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  align-items: center; padding: 10px 0; gap: 6px;
+}
+.tool {
+  width: 36px; height: 36px; border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg2);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.15s;
+  font-size: 14px; color: var(--text2);
+  position: relative;
+}
+.tool:hover { border-color: var(--border2); color: var(--text); background: var(--bg3); }
+.tool.active { background: rgba(79,140,255,0.15); border-color: var(--accent); color: var(--accent); }
+.tool-sep { width: 28px; height: 1px; background: var(--border); margin: 2px 0; }
+.tool-tip {
+  position: absolute; left: 44px; top: 50%; transform: translateY(-50%);
+  background: var(--bg3); border: 1px solid var(--border2);
+  color: var(--text); font-size: 10px; white-space: nowrap;
+  padding: 4px 8px; border-radius: 4px; pointer-events: none;
+  opacity: 0; transition: opacity 0.15s; z-index: 200;
+}
+.tool:hover .tool-tip { opacity: 1; }
+
+/* CANVAS */
+.canvas-area {
+  position: relative; overflow: hidden; background: var(--bg);
+  background-image: radial-gradient(circle, var(--border) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+#diagram-svg {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  cursor: default;
+}
+.canvas-hint {
+  position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+  font-size: 10px; color: var(--text3); letter-spacing: 0.05em;
+  pointer-events: none; background: var(--bg1);
+  border: 1px solid var(--border); padding: 4px 12px; border-radius: 20px;
+}
+
+/* RIGHT PANEL */
+.right-panel {
+  background: var(--bg1);
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.panel-tabs {
+  display: flex; border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.panel-tab {
+  padding: 10px 16px; font-size: 11px; color: var(--text2);
+  cursor: pointer; border-bottom: 2px solid transparent;
+  transition: all 0.15s; letter-spacing: 0.05em;
+}
+.panel-tab:hover { color: var(--text); }
+.panel-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.panel-content { flex: 1; overflow-y: auto; padding: 14px; }
+.panel-section { margin-bottom: 20px; }
+.panel-section-title {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--text3); margin-bottom: 8px;
+}
+
+/* TRANSITION TABLE */
+.trans-table {
+  width: 100%; border-collapse: collapse; font-size: 11px;
+}
+.trans-table th {
+  background: var(--bg2); color: var(--text2);
+  padding: 5px 8px; border: 1px solid var(--border);
+  font-weight: 500; text-align: left; white-space: nowrap;
+}
+.trans-table td {
+  padding: 0; border: 1px solid var(--border); background: var(--bg);
+}
+.trans-table td input {
+  width: 100%; background: transparent; border: none;
+  color: var(--text); font-family: var(--font-mono); font-size: 11px;
+  padding: 5px 8px; outline: none;
+}
+.trans-table td input:focus { background: rgba(79,140,255,0.08); }
+.trans-table tr.active-row td { background: rgba(79,140,255,0.12); }
+.trans-table tr:hover td { background: var(--bg2); }
+.trans-table .del-btn {
+  background: none; border: none; color: var(--text3);
+  cursor: pointer; padding: 4px 8px; font-size: 12px;
+  width: 100%;
+}
+.trans-table .del-btn:hover { color: var(--red); }
+.add-row-btn {
+  width: 100%; margin-top: 6px; padding: 7px; font-size: 11px;
+  background: var(--bg2); border: 1px dashed var(--border);
+  color: var(--text2); border-radius: 5px; cursor: pointer;
+  transition: all 0.15s; font-family: var(--font-mono);
+}
+.add-row-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* RUN PANEL */
+.run-section { display: flex; flex-direction: column; gap: 10px; }
+.input-row { display: flex; gap: 8px; align-items: center; }
+.input-row label { font-size: 11px; color: var(--text2); white-space: nowrap; }
+.input-row input[type=text] {
+  flex: 1; background: var(--bg2); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--font-mono); font-size: 12px;
+  padding: 6px 10px; border-radius: 5px; outline: none;
+}
+.input-row input:focus { border-color: var(--accent); }
+.run-controls { display: flex; gap: 6px; flex-wrap: wrap; }
+.speed-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text2); }
+.speed-row input[type=range] { flex: 1; accent-color: var(--accent); }
+
+/* TAPES */
+.tape-wrap { margin-bottom: 12px; }
+.tape-label-row {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+}
+.tape-badge {
+  font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 500;
+}
+.tape-badge.t0 { background: rgba(79,140,255,0.15); color: #7ab4ff; border: 1px solid rgba(79,140,255,0.3); }
+.tape-badge.t1 { background: rgba(61,220,132,0.12); color: #6deaaa; border: 1px solid rgba(61,220,132,0.3); }
+.tape-badge.t2 { background: rgba(255,179,71,0.12); color: #ffc96e; border: 1px solid rgba(255,179,71,0.3); }
+.tape-scroller { overflow: hidden; position: relative; }
+.tape-inner { display: flex; transition: transform 0.25s cubic-bezier(.4,0,.2,1); }
+.tape-cell {
+  width: 40px; min-width: 40px; height: 44px;
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 500; color: var(--text);
+  background: var(--bg); position: relative; flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s;
+}
+.tape-cell.blank { color: var(--text3); font-size: 11px; }
+.tape-cell.head-cell {
+  background: rgba(79,140,255,0.15);
+  border-color: var(--accent);
+}
+.tape-cell.head-cell-2 {
+  background: rgba(61,220,132,0.15);
+  border-color: var(--green);
+}
+.tape-cell.written {
+  background: rgba(61,220,132,0.08);
+}
+.head-marker {
+  position: absolute; top: -16px; left: 50%; transform: translateX(-50%);
+  font-size: 9px; color: var(--accent); white-space: nowrap; font-weight: 700;
+}
+.head-marker.h2 { color: var(--green); }
+
+/* STATE DISPLAY */
+.state-info-row {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;
+}
+.info-chip {
+  font-size: 11px; padding: 5px 10px; border-radius: 5px;
+  border: 1px solid var(--border); background: var(--bg2); color: var(--text2);
+}
+.info-chip span { color: var(--text); font-weight: 500; }
+.info-chip.halt-accept { border-color: var(--green); color: var(--green); background: rgba(61,220,132,0.08); }
+.info-chip.halt-reject { border-color: var(--red); color: var(--red); background: rgba(255,79,106,0.08); }
+
+/* COMPARISON */
+.cmp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+.cmp-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 12px;
+}
+.cmp-card .cmp-label { font-size: 10px; color: var(--text3); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.08em; }
+.cmp-card .cmp-val { font-size: 18px; font-weight: 700; color: var(--text); }
+.cmp-card .cmp-sub { font-size: 10px; color: var(--text2); margin-top: 2px; }
+.cmp-card.good .cmp-val { color: var(--green); }
+.cmp-card.bad .cmp-val { color: var(--red); }
+.complexity-bar {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 12px; margin-top: 8px;
+}
+.cmp-bar-label { font-size: 10px; color: var(--text3); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.08em; }
+.bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; font-size: 10px; }
+.bar-track { flex: 1; height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s; }
+.bar-fill.multi { background: var(--green); }
+.bar-fill.single { background: var(--red); }
+.bar-name { width: 70px; color: var(--text2); }
+.bar-num { width: 40px; text-align: right; color: var(--text); }
+
+/* STEP LOG */
+.step-log {
+  max-height: 120px; overflow-y: auto;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 6px; padding: 8px 10px; font-size: 10px;
+  color: var(--text2); line-height: 1.7;
+}
+.step-log .log-step { color: var(--accent); }
+.step-log .log-highlight { color: var(--text); }
+
+/* SVG DIAGRAM ELEMENTS */
+.state-circle { cursor: pointer; }
+.state-circle circle { transition: fill 0.2s, stroke 0.2s; }
+.state-circle.selected circle { stroke: var(--amber) !important; stroke-width: 3 !important; }
+.state-circle.active circle { fill: rgba(79,140,255,0.25) !important; stroke: var(--accent) !important; stroke-width: 2.5 !important; }
+.state-circle.accepting circle.inner { display: block !important; }
+.state-circle.halted-accept circle { fill: rgba(61,220,132,0.25) !important; stroke: var(--green) !important; }
+.state-circle.halted-reject circle { fill: rgba(255,79,106,0.25) !important; stroke: var(--red) !important; }
+
+/* MODAL */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.2s;
+}
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal-box {
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: 12px; padding: 24px; width: 400px; max-width: 95vw;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+.modal-title {
+  font-family: var(--font-display); font-size: 14px; font-weight: 600;
+  color: var(--text); margin-bottom: 16px; letter-spacing: 0.04em;
+}
+.modal-field { margin-bottom: 12px; }
+.modal-field label { font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.1em; display: block; margin-bottom: 5px; }
+.modal-field input, .modal-field select {
+  width: 100%; background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--font-mono); font-size: 12px;
+  padding: 8px 10px; border-radius: 6px; outline: none;
+}
+.modal-field input:focus, .modal-field select:focus { border-color: var(--accent); }
+.modal-hint { font-size: 10px; color: var(--text3); margin-top: 4px; }
+.modal-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+.modal-actions .btn { padding: 7px 18px; font-size: 12px; }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+/* COMPARE OVERLAY */
+.cmp-overlay {
+  position: fixed; top: 48px; left: 0; right: 0; bottom: 0;
+  background: var(--bg); z-index: 200; overflow: hidden;
+  display: none; flex-direction: column;
+}
+.cmp-overlay.open { display: flex; }
+
+/* top input bar */
+.cmp-bar {
+  background: var(--bg1); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px; padding: 10px 20px; flex-shrink: 0;
+}
+.cmp-bar-title {
+  font-size: 11px; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase;
+  white-space: nowrap;
+}
+.cmp-bar input[type=text] {
+  flex: 1; max-width: 320px; background: var(--bg2); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--font-mono); font-size: 13px;
+  padding: 7px 12px; border-radius: 6px; outline: none;
+}
+.cmp-bar input[type=text]:focus { border-color: var(--accent); }
+
+/* two-panel grid */
+.cmp-panels {
+  flex: 1; display: grid; grid-template-columns: 1fr 1fr;
+  gap: 0; overflow: hidden; min-height: 0;
+}
+.cmp-panel {
+  display: flex; flex-direction: column; overflow-y: auto;
+  border-right: 1px solid var(--border); padding: 20px; gap: 14px;
+}
+.cmp-panel:last-child { border-right: none; }
+
+/* panel header */
+.cpanel-head {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex-shrink: 0;
+}
+.cpanel-title {
+  font-family: var(--font-display); font-size: 13px; font-weight: 600;
+  color: var(--text); letter-spacing: 0.06em; margin-right: 4px;
+}
+.cp-badge {
+  font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 500;
+  border: 1px solid; white-space: nowrap;
+}
+.cp-badge.b-state { background: rgba(61,220,132,0.1); color: #6deaaa; border-color: rgba(61,220,132,0.35); }
+.cp-badge.b-steps { background: rgba(124,92,252,0.1); color: #a98bfc; border-color: rgba(124,92,252,0.35); }
+.cp-badge.b-run   { background: rgba(61,220,132,0.1); color: #6deaaa; border-color: rgba(61,220,132,0.35); }
+.cp-badge.b-idle  { background: var(--bg2); color: var(--text3); border-color: var(--border); }
+.cp-badge.b-acc   { background: rgba(61,220,132,0.15); color: #3ddc84; border-color: var(--green); }
+.cp-badge.b-rej   { background: rgba(255,79,106,0.15); color: #ff4f6a; border-color: var(--red); }
+
+/* tape area */
+.cp-tape-wrap { flex-shrink: 0; }
+.cp-tape-lbl {
+  font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em;
+  margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+}
+.cp-tape-lbl .head-at { color: var(--text3); font-weight: 400; }
+.cp-tape-row {
+  display: flex; overflow: hidden; position: relative;
+  padding-top: 18px; /* room for head marker above */
+}
+.cp-cell {
+  width: 36px; min-width: 36px; height: 42px;
+  border: 1px solid var(--border); margin-right: -1px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 500; color: var(--text);
+  background: var(--bg2); position: relative; flex-shrink: 0;
+  transition: background 0.12s, border-color 0.12s;
+  font-family: var(--font-mono);
+}
+.cp-cell:first-child { border-radius: 4px 0 0 4px; }
+.cp-cell:last-child  { border-radius: 0 4px 4px 0; margin-right: 0; }
+.cp-cell.cp-blank { color: var(--text3); font-size: 11px; }
+.cp-cell.cp-head  { background: rgba(61,220,132,0.1); border-color: var(--green); border-width: 1px; z-index: 1; }
+.cp-cell.cp-written { background: rgba(79,140,255,0.07); }
+.cp-head-arrow {
+  position: absolute; top: -16px; left: 50%; transform: translateX(-50%);
+  color: var(--green); font-size: 10px; pointer-events: none; white-space: nowrap;
+}
+
+/* diagram card */
+.cp-diagram-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px; flex-shrink: 0;
+}
+.cp-diagram-card-title { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; }
+.cp-diagram-card svg { width: 100%; display: block; overflow: visible; }
+
+/* per-panel controls */
+.cp-controls {
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap;
+}
+.cp-ctrl-btn {
+  width: 36px; height: 36px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg2);
+  color: var(--text2); cursor: pointer; display: flex; align-items: center; justify-content: center;
+  font-size: 14px; transition: all 0.12s;
+}
+.cp-ctrl-btn:hover { border-color: var(--border2); color: var(--text); background: var(--bg3); }
+.cp-ctrl-btn.play-active { background: var(--green); border-color: var(--green); color: #000; }
+.cp-speed-row { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.cp-speed-row label { font-size: 10px; color: var(--text3); }
+.cp-speed-row input[type=range] { width: 72px; accent-color: var(--green); }
+
+/* stats row */
+.cp-stats {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; flex-shrink: 0;
+}
+.cp-stat-card {
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px 8px; text-align: center;
+}
+.cp-stat-val { font-size: 22px; font-weight: 700; font-family: var(--font-display); }
+.cp-stat-lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text3); margin-top: 3px; }
+
+/* insight */
+.cmp-insight-bar {
+  background: rgba(124,92,252,0.07); border-top: 1px solid rgba(124,92,252,0.18);
+  padding: 10px 24px; font-size: 11px; color: var(--text2); line-height: 1.6;
+  flex-shrink: 0;
+}
+.cmp-insight-bar strong { color: var(--accent2); }
+.cmp-insight-bar .hl-green { color: var(--green); font-weight: 600; }
+.cmp-insight-bar .hl-red   { color: var(--red); font-weight: 600; }
+.cmp-insight-bar .hl-teal  { color: var(--teal); font-weight: 600; }
+
+/* empty state */
+.cp-empty {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  color: var(--text3); font-size: 11px; text-align: center; line-height: 1.8;
+  padding: 30px; min-height: 120px;
+}
+
+/* SAVE/LOAD DRAWER */
+.save-drawer {
+  position: fixed; top: 48px; right: 0; width: 320px; height: calc(100vh - 48px);
+  background: var(--bg1); border-left: 1px solid var(--border2);
+  z-index: 500; display: flex; flex-direction: column;
+  transform: translateX(100%); transition: transform 0.25s cubic-bezier(.4,0,.2,1);
+  box-shadow: -8px 0 32px rgba(0,0,0,0.4);
+}
+.save-drawer.open { transform: translateX(0); }
+.drawer-header {
+  padding: 16px 16px 12px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+}
+.drawer-title { font-family: var(--font-display); font-size: 13px; font-weight: 600; letter-spacing: 0.06em; color: var(--text); }
+.drawer-close {
+  width: 26px; height: 26px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--bg2);
+  color: var(--text2); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px;
+}
+.drawer-close:hover { color: var(--text); border-color: var(--border2); }
+.drawer-body { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+.drawer-section-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text3); margin-bottom: 8px; }
+.save-name-row { display: flex; gap: 6px; }
+.save-name-row input {
+  flex: 1; background: var(--bg2); border: 1px solid var(--border);
+  color: var(--text); font-family: var(--font-mono); font-size: 12px;
+  padding: 7px 10px; border-radius: 6px; outline: none;
+}
+.save-name-row input:focus { border-color: var(--accent); }
+.saved-list { display: flex; flex-direction: column; gap: 6px; }
+.saved-item {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 12px;
+  display: flex; align-items: center; gap: 8px;
+  transition: border-color 0.15s;
+}
+.saved-item:hover { border-color: var(--border2); }
+.saved-item-info { flex: 1; min-width: 0; }
+.saved-item-name { font-size: 12px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.saved-item-meta { font-size: 10px; color: var(--text3); margin-top: 2px; }
+.saved-item-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.icon-btn {
+  width: 26px; height: 26px; border-radius: 5px;
+  border: 1px solid var(--border); background: var(--bg3);
+  color: var(--text2); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 12px;
+  transition: all 0.12s;
+}
+.icon-btn:hover { border-color: var(--border2); color: var(--text); }
+.icon-btn.load-btn:hover { border-color: var(--accent); color: var(--accent); }
+.icon-btn.del-btn:hover { border-color: var(--red); color: var(--red); }
+.drawer-divider { height: 1px; background: var(--border); }
+.file-io-row { display: flex; gap: 6px; }
+.empty-list { font-size: 11px; color: var(--text3); text-align: center; padding: 20px 0; }
+.toast {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  background: var(--bg3); border: 1px solid var(--border2);
+  color: var(--text); font-size: 12px; padding: 8px 18px; border-radius: 20px;
+  z-index: 9999; opacity: 0; pointer-events: none; transition: opacity 0.2s;
+  font-family: var(--font-mono);
+}
+.toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="logo">TM<span>playground</span></div>
+  <div class="topbar-sep"></div>
+  <div class="tape-config">
+    <span>Tapes:</span>
+    <input type="number" id="tape-count" value="2" min="1" max="4" style="width:46px"/>
+    <span style="margin-left:8px">Heads/tape:</span>
+    <input type="number" id="head-count" value="1" min="1" max="2" style="width:46px"/>
+    <button class="btn" onclick="applyConfig()">Apply</button>
+  </div>
+  <div class="topbar-sep"></div>
+  <div class="tape-config">
+    <span>Load example:</span>
+    <select id="example-select" onchange="loadExample(this.value)">
+      <option value="">— pick —</option>
+      <option value="copy">Copy (2-tape)</option>
+      <option value="palindrome">Palindrome (2-tape)</option>
+      <option value="increment">Binary +1 (1-tape)</option>
+      <option value="accept_all">Accept All</option>
+    </select>
+  </div>
+  <div class="top-actions">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-text" style="font-size:10px;color:var(--text2)">idle</span>
+    <button class="btn" onclick="toggleDrawer()" id="save-drawer-btn">💾 Saves</button>
+    <button class="btn danger" onclick="resetAll()">Clear All</button>
+  </div>
+</div>
+
+<!-- SAVE/LOAD DRAWER -->
+<div class="save-drawer" id="save-drawer">
+  <div class="drawer-header">
+    <span class="drawer-title">SAVED MACHINES</span>
+    <button class="drawer-close" onclick="toggleDrawer()">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div>
+      <div class="drawer-section-title">Save current machine</div>
+      <div class="save-name-row">
+        <input type="text" id="save-name-input" placeholder="e.g. my_palindrome_v2" maxlength="40"/>
+        <button class="btn accent" onclick="saveMachine()">Save</button>
+      </div>
+    </div>
+    <div class="drawer-divider"></div>
+    <div>
+      <div class="drawer-section-title">Saved machines</div>
+      <div class="saved-list" id="saved-list">
+        <div class="empty-list">No saved machines yet.</div>
+      </div>
+    </div>
+    <div class="drawer-divider"></div>
+    <div>
+      <div class="drawer-section-title">Import / Export JSON</div>
+      <div class="file-io-row">
+        <button class="btn" style="flex:1" onclick="exportJSON()">⬇ Export .json</button>
+        <label class="btn" style="flex:1;text-align:center;cursor:pointer">
+          ⬆ Import .json
+          <input type="file" accept=".json,application/json" onchange="importJSON(event)" style="display:none"/>
+        </label>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-top:8px;line-height:1.6">
+        Export downloads a .json file you can share or back up. Import loads any previously exported file.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- PALETTE -->
+  <div class="palette">
+    <div class="tool active" id="tool-grab" data-tool="grab" onclick="setTool('grab')">
+      ✦<div class="tool-tip">Select / Move</div>
+    </div>
+    <div class="tool-sep"></div>
+    <div class="tool" id="tool-state" data-tool="state" onclick="setTool('state')">
+      ◯<div class="tool-tip">Add State</div>
+    </div>
+    <div class="tool" id="tool-accept" data-tool="accept" onclick="setTool('accept')">
+      ⊙<div class="tool-tip">Accept State</div>
+    </div>
+    <div class="tool" id="tool-reject" data-tool="reject" onclick="setTool('reject')">
+      ✕<div class="tool-tip">Reject State</div>
+    </div>
+    <div class="tool" id="tool-start" data-tool="start" onclick="setTool('start')">
+      ▶<div class="tool-tip">Set Initial State</div>
+    </div>
+    <div class="tool-sep"></div>
+    <div class="tool" id="tool-arrow" data-tool="arrow" onclick="setTool('arrow')">
+      →<div class="tool-tip">Add Transition</div>
+    </div>
+    <div class="tool-sep"></div>
+    <div class="tool" id="tool-delete" data-tool="delete" onclick="setTool('delete')">
+      ⌫<div class="tool-tip">Delete</div>
+    </div>
+  </div>
+
+  <!-- CANVAS -->
+  <div class="canvas-area" id="canvas-area">
+    <svg id="diagram-svg" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow-normal" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0,8 3,0 6" fill="#4f8cff" opacity="0.7"/>
+        </marker>
+        <marker id="arrow-active" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0,8 3,0 6" fill="#4f8cff"/>
+        </marker>
+      </defs>
+      <g id="edges-layer"></g>
+      <g id="states-layer"></g>
+    </svg>
+    <div class="canvas-hint" id="canvas-hint">click canvas with a tool selected to add states</div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <div class="panel-tabs">
+      <div class="panel-tab active" onclick="switchTab('run')" id="tab-run">▶ Run</div>
+      <div class="panel-tab" onclick="switchTab('table')" id="tab-table">⊞ Table</div>
+      <div class="panel-tab" onclick="switchTab('compare')" id="tab-compare">≈ Compare</div>
+    </div>
+
+    <!-- RUN TAB -->
+    <div class="panel-content" id="pane-run">
+      <div class="run-section">
+        <div class="input-row">
+          <label>Input:</label>
+          <input type="text" id="run-input" value="1011" placeholder="tape input"/>
+        </div>
+        <div class="state-info-row" id="state-info-row">
+          <div class="info-chip">state: <span id="cur-state-display">—</span></div>
+          <div class="info-chip">step: <span id="cur-step-display">0</span></div>
+        </div>
+        <div class="run-controls">
+          <button class="btn accent" onclick="runInit()">⏮ Load</button>
+          <button class="btn" onclick="runStep()">Step →</button>
+          <button class="btn" id="play-btn" onclick="togglePlay()">▶ Play</button>
+          <button class="btn" onclick="runReset()">⟳ Reset</button>
+        </div>
+        <div class="speed-row">
+          <span>Speed:</span>
+          <input type="range" min="1" max="10" value="5" id="speed-range"/>
+        </div>
+      </div>
+
+      <div class="panel-section" id="tapes-section" style="margin-top:16px">
+        <div class="panel-section-title">Tapes</div>
+        <div id="tapes-container"></div>
+      </div>
+
+      <div class="panel-section">
+        <div class="panel-section-title">Step Log</div>
+        <div class="step-log" id="step-log"><span style="color:var(--text3)">Load machine and run to see execution log.</span></div>
+      </div>
+    </div>
+
+    <!-- TABLE TAB -->
+    <div class="panel-content" id="pane-table" style="display:none">
+      <div style="margin-bottom:8px;font-size:10px;color:var(--text3)">
+        Editing the table automatically updates the state diagram.
+      </div>
+      <div id="table-container"></div>
+      <button class="add-row-btn" onclick="addTransitionRow()">+ Add Transition</button>
+    </div>
+
+    <!-- COMPARE TAB (placeholder - real UI is overlay) -->
+    <div class="panel-content" id="pane-compare" style="display:none">
+    </div>
+
+  </div>
+</div>
+
+<!-- COMPARE OVERLAY -->
+<div class="cmp-overlay" id="cmp-overlay">
+
+  <!-- top bar -->
+  <div class="cmp-bar">
+    <span class="cmp-bar-title">Compare O(n²) single-tape vs O(n) multi-tape</span>
+    <input type="text" id="cmp-input" value="10111101" placeholder="input string"/>
+    <button class="btn accent" style="padding:7px 18px;font-size:12px" onclick="cmpRunBoth()">▶ Run Both</button>
+    <button class="btn" style="margin-left:auto" onclick="switchTab('run')">✕ Close</button>
+  </div>
+
+  <!-- two panels -->
+  <div class="cmp-panels">
+
+    <!-- LEFT: single tape -->
+    <div class="cmp-panel" id="cp-left">
+      <div class="cpanel-head">
+        <span class="cpanel-title">← Single Tape (O(n²))</span>
+        <span class="cp-badge b-state">State: <span id="cs-state">—</span></span>
+        <span class="cp-badge b-steps">Steps: <span id="cs-steps">0</span></span>
+        <span class="cp-badge b-idle" id="cs-status">idle</span>
+      </div>
+      <div id="cs-tape-area"></div>
+      <div class="cp-diagram-card">
+        <div class="cp-diagram-card-title">State Diagram</div>
+        <div id="cs-diagram"></div>
+      </div>
+      <div class="cp-controls">
+        <button class="cp-ctrl-btn" title="Restart" onclick="cmpStRestart()">⏮</button>
+        <button class="cp-ctrl-btn" id="cs-play-btn" title="Play/Pause" onclick="cmpStTogglePlay()">▶</button>
+        <button class="cp-ctrl-btn" title="Step" onclick="cmpStStep()">⏭</button>
+        <button class="cp-ctrl-btn" title="Reset" onclick="cmpStReset()">↺</button>
+        <div class="cp-speed-row">
+          <label>Speed</label>
+          <input type="range" min="1" max="10" value="6" id="cs-speed"/>
+          <div style="width:28px;height:28px;border-radius:50%;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;">
+            <div style="width:12px;height:12px;border-radius:50%;background:var(--green)"></div>
+          </div>
+        </div>
+      </div>
+      <div class="cp-stats">
+        <div class="cp-stat-card"><div class="cp-stat-val" id="cs-stat-steps" style="color:var(--green)">0</div><div class="cp-stat-lbl">Steps</div></div>
+        <div class="cp-stat-card"><div class="cp-stat-val" style="color:var(--text2)">1</div><div class="cp-stat-lbl">Tapes</div></div>
+        <div class="cp-stat-card"><div class="cp-stat-val" id="cs-stat-cells">0</div><div class="cp-stat-lbl">Cells Used</div></div>
+      </div>
+    </div>
+
+    <!-- RIGHT: multi tape -->
+    <div class="cmp-panel" id="cp-right">
+      <div class="cpanel-head">
+        <span class="cpanel-title">⇒ Multi Tape (O(n))</span>
+        <span class="cp-badge b-state">State: <span id="cm-state">—</span></span>
+        <span class="cp-badge b-steps">Steps: <span id="cm-steps">0</span></span>
+        <span class="cp-badge b-idle" id="cm-status">idle</span>
+      </div>
+      <div id="cm-tape-area"></div>
+      <div class="cp-diagram-card">
+        <div class="cp-diagram-card-title">State Diagram</div>
+        <div id="cm-diagram"></div>
+      </div>
+      <div class="cp-controls">
+        <button class="cp-ctrl-btn" title="Restart" onclick="cmpMtRestart()">⏮</button>
+        <button class="cp-ctrl-btn" id="cm-play-btn" title="Play/Pause" onclick="cmpMtTogglePlay()">▶</button>
+        <button class="cp-ctrl-btn" title="Step" onclick="cmpMtStep()">⏭</button>
+        <button class="cp-ctrl-btn" title="Reset" onclick="cmpMtReset()">↺</button>
+        <div class="cp-speed-row">
+          <label>Speed</label>
+          <input type="range" min="1" max="10" value="6" id="cm-speed"/>
+          <div style="width:28px;height:28px;border-radius:50%;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;">
+            <div style="width:12px;height:12px;border-radius:50%;background:var(--green)"></div>
+          </div>
+        </div>
+      </div>
+      <div class="cp-stats">
+        <div class="cp-stat-card"><div class="cp-stat-val" id="cm-stat-steps" style="color:var(--accent)">0</div><div class="cp-stat-lbl">Steps</div></div>
+        <div class="cp-stat-card"><div class="cp-stat-val" id="cm-stat-tapes" style="color:var(--accent2)">2</div><div class="cp-stat-lbl">Tapes</div></div>
+        <div class="cp-stat-card"><div class="cp-stat-val" id="cm-stat-cells">0</div><div class="cp-stat-lbl">Cells Used</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- insight bar -->
+  <div class="cmp-insight-bar" id="cmp-insight-bar">
+    💡 <strong>How to use:</strong> Load <strong>Copy</strong> or <strong>Palindrome</strong> from the examples menu, type an input, then click <strong>▶ Run Both</strong> to watch both machines execute simultaneously and compare their actual step counts.
+  </div>
+</div>
+
+<!-- TRANSITION MODAL -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-title">Define Transition</div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:14px" id="modal-edge-desc">— → —</div>
+    <div id="modal-tape-inputs"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn accent" onclick="confirmTransition()">Add →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// STATE MACHINE
+// ============================================================
+let cfg = { tapes: 2, heads: 1 };
+let currentTool = 'grab';
+let states = [];       // {id, label, x, y, type: 'normal'|'accept'|'reject'|'initial'}
+let transitions = [];  // {id, from, to, rules:[{read:[...], write:[...], move:[...]}]}
+let nextStateId = 0;
+let nextTransId = 0;
+let selectedId = null;
+let arrowFrom = null;
+
+// Runtime
+let rt = null; // runtime object
+let currentExampleKey = ''; // tracks last loaded built-in example
+
+// ============================================================
+// TOOL MANAGEMENT
+// ============================================================
+function setTool(t) {
+  currentTool = t;
+  document.querySelectorAll('.tool').forEach(el => el.classList.remove('active'));
+  document.getElementById('tool-' + t).classList.add('active');
+  arrowFrom = null;
+  updateHint();
+}
+
+const hints = {
+  grab: 'click to select, drag to move states',
+  state: 'click canvas to add a state',
+  accept: 'click canvas to add accept state',
+  reject: 'click canvas to add reject state',
+  start: 'click a state to mark it as initial',
+  arrow: 'click source state, then destination',
+  delete: 'click a state or transition to delete'
+};
+function updateHint() {
+  document.getElementById('canvas-hint').textContent = hints[currentTool] || '';
+}
+
+// ============================================================
+// SVG CANVAS INTERACTIONS
+// ============================================================
+const svg = document.getElementById('diagram-svg');
+const edgesLayer = document.getElementById('edges-layer');
+const statesLayer = document.getElementById('states-layer');
+
+svg.addEventListener('click', (e) => {
+  if (e.target === svg || e.target.id === 'diagram-svg') {
+    const pt = svgPoint(e);
+    if (currentTool === 'state') addState(pt.x, pt.y, 'normal');
+    else if (currentTool === 'accept') addState(pt.x, pt.y, 'accept');
+    else if (currentTool === 'reject') addState(pt.x, pt.y, 'reject');
+    else {
+      selectedId = null;
+      renderDiagram();
+    }
+  }
+});
+
+function svgPoint(e) {
+  const rect = svg.getBoundingClientRect();
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
+// ============================================================
+// STATE MANAGEMENT
+// ============================================================
+function addState(x, y, type) {
+  const label = type === 'accept' ? 'qA' : type === 'reject' ? 'qR' : 'q' + nextStateId;
+  if (type === 'accept' && states.find(s => s.type === 'accept')) { alert('Only one accept state (use table for multi-accept).'); return; }
+  if (type === 'reject' && states.find(s => s.type === 'reject')) { alert('Only one reject state.'); return; }
+  const initial = states.length === 0 || type === 'initial' ? true : false;
+  const s = {
+    id: 's' + (nextStateId++),
+    label: type === 'accept' ? 'qA' : type === 'reject' ? 'qR' : ('q' + (nextStateId-1)),
+    x, y, type,
+    initial: states.filter(s=>s.initial).length === 0
+  };
+  states.push(s);
+  renderDiagram();
+  syncTableFromDiagram();
+}
+
+function deleteState(id) {
+  states = states.filter(s => s.id !== id);
+  transitions = transitions.filter(t => t.from !== id && t.to !== id);
+  if (selectedId === id) selectedId = null;
+  renderDiagram();
+  syncTableFromDiagram();
+}
+
+function deleteTransition(id) {
+  transitions = transitions.filter(t => t.id !== id);
+  renderDiagram();
+  syncTableFromDiagram();
+}
+
+// ============================================================
+// RENDER DIAGRAM
+// ============================================================
+function renderDiagram() {
+  renderEdges();
+  renderStates();
+}
+
+function renderStates() {
+  statesLayer.innerHTML = '';
+  for (const s of states) {
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.setAttribute('class','state-circle' +
+      (s.id === selectedId ? ' selected':'') +
+      (s.type === 'accept' ? ' accepting':'') +
+      (rt && rt.state === s.label ? ' active':'') +
+      (rt && rt.halted && rt.result === 'accept' && s.type==='accept' ? ' halted-accept':'') +
+      (rt && rt.halted && rt.result === 'reject' && s.type==='reject' ? ' halted-reject':'')
+    );
+    g.setAttribute('transform',`translate(${s.x},${s.y})`);
+    g.setAttribute('data-id', s.id);
+
+    // outer circle
+    const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+    circle.setAttribute('r','28');
+    circle.setAttribute('fill', s.type==='accept'?'rgba(61,220,132,0.12)':s.type==='reject'?'rgba(255,79,106,0.12)':s.type==='initial'?'rgba(79,140,255,0.1)':'rgba(30,42,69,0.9)');
+    circle.setAttribute('stroke', s.type==='accept'?'#3ddc84':s.type==='reject'?'#ff4f6a':s.type==='initial'?'#7c5cfc':'#4f8cff');
+    circle.setAttribute('stroke-width','1.5');
+    g.appendChild(circle);
+
+    // inner ring for accept
+    if (s.type === 'accept') {
+      const inner = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      inner.setAttribute('r','22');
+      inner.setAttribute('fill','none');
+      inner.setAttribute('stroke','#3ddc84');
+      inner.setAttribute('stroke-width','1');
+      inner.setAttribute('opacity','0.6');
+      g.appendChild(inner);
+    }
+
+    // label
+    const text = document.createElementNS('http://www.w3.org/2000/svg','text');
+    text.setAttribute('text-anchor','middle');
+    text.setAttribute('dominant-baseline','middle');
+    text.setAttribute('fill', s.type==='accept'?'#3ddc84':s.type==='reject'?'#ff4f6a':'#e8e8f0');
+    text.setAttribute('font-family','JetBrains Mono, monospace');
+    text.setAttribute('font-size','11');
+    text.setAttribute('font-weight','500');
+    text.textContent = s.label;
+    g.appendChild(text);
+
+    // initial arrow
+    if (s.initial) {
+      const arr = document.createElementNS('http://www.w3.org/2000/svg','line');
+      arr.setAttribute('x1','-52'); arr.setAttribute('y1','0');
+      arr.setAttribute('x2','-30'); arr.setAttribute('y2','0');
+      arr.setAttribute('stroke','#7c5cfc'); arr.setAttribute('stroke-width','2');
+      arr.setAttribute('marker-end','url(#arrow-normal)');
+      g.appendChild(arr);
+    }
+
+    // current state indicator ring
+    if (rt && rt.state === s.label && !rt.halted) {
+      const ring = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      ring.setAttribute('r','33');
+      ring.setAttribute('fill','none');
+      ring.setAttribute('stroke','#4f8cff');
+      ring.setAttribute('stroke-width','2');
+      ring.setAttribute('opacity','0.5');
+      ring.setAttribute('stroke-dasharray','4 3');
+      g.appendChild(ring);
+    }
+
+    // events
+    g.addEventListener('click', (e) => { e.stopPropagation(); handleStateClick(s.id); });
+    g.addEventListener('mousedown', (e) => { e.stopPropagation(); startDrag(s.id, e); });
+
+    statesLayer.appendChild(g);
+  }
+}
+
+function renderEdges() {
+  edgesLayer.innerHTML = '';
+  for (const t of transitions) {
+    const from = states.find(s=>s.id===t.from);
+    const to = states.find(s=>s.id===t.to);
+    if (!from || !to) continue;
+
+    const isSelf = from.id === to.id;
+    const isActive = rt && !rt.halted && rt.lastTransId === t.id;
+
+    // label text
+    const label = t.rules.map(r =>
+      r.read.join(',') + ' / ' + r.write.join(',') + ' / ' + r.move.join(',')
+    ).join('\n');
+
+    if (isSelf) {
+      // self loop
+      const cx = from.x, cy = from.y - 55;
+      const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+      path.setAttribute('d',`M ${from.x-15} ${from.y-26} Q ${cx-30} ${cy} ${cx+30} ${cy} Q ${cx+50} ${cy} ${from.x+15} ${from.y-26}`);
+      path.setAttribute('fill','none');
+      path.setAttribute('stroke', isActive?'#4f8cff':'rgba(79,140,255,0.5)');
+      path.setAttribute('stroke-width', isActive?'2':'1.5');
+      path.setAttribute('marker-end','url(#arrow-normal)');
+      edgesLayer.appendChild(path);
+      const txt = document.createElementNS('http://www.w3.org/2000/svg','text');
+      txt.setAttribute('x', String(cx)); txt.setAttribute('y', String(cy-12));
+      txt.setAttribute('text-anchor','middle');
+      txt.setAttribute('fill', isActive?'#e8e8f0':'#8888aa');
+      txt.setAttribute('font-family','JetBrains Mono, monospace');
+      txt.setAttribute('font-size','9');
+      t.rules.forEach((r,i) => {
+        const ts = document.createElementNS('http://www.w3.org/2000/svg','tspan');
+        ts.setAttribute('x',String(cx)); ts.setAttribute('dy', i===0?'0':'11');
+        ts.textContent = r.read.join(',') + '/' + r.write.join(',') + '/' + r.move.join(',');
+        txt.appendChild(ts);
+      });
+      edgesLayer.appendChild(txt);
+      // delete hotspot
+      addEdgeDeleteHotspot(cx, cy-20, t.id);
+    } else {
+      // check reverse
+      const hasReverse = transitions.find(tr => tr.id !== t.id && tr.from===t.to && tr.to===t.from);
+      const bend = hasReverse ? (t.id < (hasReverse.id) ? 40 : -40) : 0;
+      const mx = (from.x + to.x)/2, my = (from.y + to.y)/2;
+      const dx = to.x - from.x, dy = to.y - from.y;
+      const len = Math.sqrt(dx*dx+dy*dy)||1;
+      const nx = -dy/len, ny = dx/len;
+      const cpx = mx + nx*bend, cpy = my + ny*bend;
+      // trim to circle edge
+      const angle = Math.atan2(cpy-to.y, cpx-to.x);
+      const ex = to.x + Math.cos(angle)*30, ey = to.y + Math.sin(angle)*30;
+      const sangle = Math.atan2(cpy-from.y, cpx-from.x);
+      const sx = from.x + Math.cos(sangle)*30, sy = from.y + Math.sin(sangle)*30;
+      const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+      path.setAttribute('d',`M ${sx} ${sy} Q ${cpx} ${cpy} ${ex} ${ey}`);
+      path.setAttribute('fill','none');
+      path.setAttribute('stroke', isActive?'#4f8cff':'rgba(79,140,255,0.5)');
+      path.setAttribute('stroke-width', isActive?'2':'1.5');
+      path.setAttribute('marker-end','url(#arrow-normal)');
+      path.setAttribute('data-tid', t.id);
+      edgesLayer.appendChild(path);
+      const lx = cpx, ly = cpy;
+      const txt = document.createElementNS('http://www.w3.org/2000/svg','text');
+      txt.setAttribute('x', String(lx)); txt.setAttribute('y', String(ly));
+      txt.setAttribute('text-anchor','middle');
+      txt.setAttribute('fill', isActive?'#e8e8f0':'#8888aa');
+      txt.setAttribute('font-family','JetBrains Mono, monospace');
+      txt.setAttribute('font-size','9');
+      t.rules.forEach((r,i) => {
+        const ts = document.createElementNS('http://www.w3.org/2000/svg','tspan');
+        ts.setAttribute('x',String(lx)); ts.setAttribute('dy', i===0?'0':'11');
+        ts.textContent = r.read.join(',') + '/' + r.write.join(',') + '/' + r.move.join(',');
+        txt.appendChild(ts);
+      });
+      edgesLayer.appendChild(txt);
+      addEdgeDeleteHotspot(lx, ly, t.id);
+    }
+  }
+}
+
+function addEdgeDeleteHotspot(x, y, tid) {
+  if (currentTool !== 'delete') return;
+  const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+  rect.setAttribute('x', String(x-20)); rect.setAttribute('y', String(y-20));
+  rect.setAttribute('width','40'); rect.setAttribute('height','40');
+  rect.setAttribute('fill','rgba(255,79,106,0.15)');
+  rect.setAttribute('rx','4'); rect.setAttribute('stroke','#ff4f6a');
+  rect.setAttribute('stroke-width','1'); rect.style.cursor='pointer';
+  rect.addEventListener('click', (e) => { e.stopPropagation(); deleteTransition(tid); });
+  edgesLayer.appendChild(rect);
+}
+
+// ============================================================
+// STATE CLICK HANDLER
+// ============================================================
+function handleStateClick(id) {
+  if (currentTool === 'grab') {
+    selectedId = id; renderDiagram();
+  } else if (currentTool === 'arrow') {
+    if (!arrowFrom) {
+      arrowFrom = id;
+      updateHint(); // show next step
+      document.getElementById('canvas-hint').textContent = 'now click destination state';
+    } else {
+      openTransitionModal(arrowFrom, id);
+      arrowFrom = null;
+      document.getElementById('canvas-hint').textContent = hints['arrow'];
+    }
+  } else if (currentTool === 'start') {
+    states.forEach(s => s.initial = false);
+    states.find(s=>s.id===id).initial = true;
+    renderDiagram();
+  } else if (currentTool === 'delete') {
+    deleteState(id);
+  } else if (currentTool === 'accept') {
+    const s = states.find(s=>s.id===id);
+    if (s) { s.type = 'accept'; s.label = 'qA'; renderDiagram(); syncTableFromDiagram(); }
+  } else if (currentTool === 'reject') {
+    const s = states.find(s=>s.id===id);
+    if (s) { s.type = 'reject'; s.label = 'qR'; renderDiagram(); syncTableFromDiagram(); }
+  }
+}
+
+// ============================================================
+// DRAG
+// ============================================================
+let dragging = null, dragOff = {x:0,y:0};
+function startDrag(id, e) {
+  if (currentTool !== 'grab') return;
+  dragging = id;
+  const s = states.find(s=>s.id===id);
+  const rect = svg.getBoundingClientRect();
+  dragOff = { x: e.clientX - rect.left - s.x, y: e.clientY - rect.top - s.y };
+}
+document.addEventListener('mousemove', (e) => {
+  if (!dragging) return;
+  const rect = svg.getBoundingClientRect();
+  const s = states.find(s=>s.id===dragging);
+  if (s) { s.x = e.clientX-rect.left-dragOff.x; s.y = e.clientY-rect.top-dragOff.y; }
+  renderDiagram();
+});
+document.addEventListener('mouseup', () => { dragging = null; });
+
+// ============================================================
+// TRANSITION MODAL
+// ============================================================
+let pendingEdge = null;
+function openTransitionModal(fromId, toId) {
+  const from = states.find(s=>s.id===fromId);
+  const to = states.find(s=>s.id===toId);
+  pendingEdge = { fromId, toId };
+  document.getElementById('modal-edge-desc').textContent = (from?.label||'?') + '  →  ' + (to?.label||'?');
+  const container = document.getElementById('modal-tape-inputs');
+  container.innerHTML = '';
+  for (let i = 0; i < cfg.tapes; i++) {
+    const div = document.createElement('div');
+    div.className = 'modal-field';
+    div.innerHTML = `<label>Tape ${i+1}: read / write / move</label>
+      <div style="display:flex;gap:6px">
+        <input placeholder="read (e.g. 0,B)" id="mr-${i}" style="flex:1"/>
+        <input placeholder="write (e.g. 1,B)" id="mw-${i}" style="flex:1"/>
+        <input placeholder="move (L/R/S)" id="mm-${i}" style="width:70px"/>
+      </div>
+      <div class="modal-hint">Use comma for multiple symbols (multi-head). B = blank.</div>`;
+    container.appendChild(div);
+  }
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  pendingEdge = null;
+}
+
+function confirmTransition() {
+  if (!pendingEdge) return;
+  const rules = [];
+  for (let i = 0; i < cfg.tapes; i++) {
+    const r = document.getElementById('mr-'+i)?.value.trim() || 'B';
+    const w = document.getElementById('mw-'+i)?.value.trim() || 'B';
+    const m = document.getElementById('mm-'+i)?.value.trim().toUpperCase() || 'R';
+    rules.push({
+      read: r.replace(/[\[\]]/g,'').split(',').map(x=>x.trim()),
+      write: w.replace(/[\[\]]/g,'').split(',').map(x=>x.trim()),
+      move: m.replace(/[\[\]]/g,'').split(',').map(x=>x.trim())
+    });
+  }
+  // find existing edge between same states
+  const existing = transitions.find(t=>t.from===pendingEdge.fromId && t.to===pendingEdge.toId);
+  if (existing) {
+    existing.rules.push(...rules);
+  } else {
+    transitions.push({ id: 't'+(nextTransId++), from: pendingEdge.fromId, to: pendingEdge.toId, rules });
+  }
+  closeModal();
+  renderDiagram();
+  syncTableFromDiagram();
+}
+
+// ============================================================
+// TRANSITION TABLE (RIGHT PANEL)
+// ============================================================
+function syncTableFromDiagram() {
+  const container = document.getElementById('table-container');
+  const thead = (() => {
+    let th = '<tr><th>From</th><th>To</th>';
+    for (let i=0;i<cfg.tapes;i++) th += `<th>Read T${i+1}</th><th>Write T${i+1}</th><th>Move T${i+1}</th>`;
+    return th + '<th></th></tr>';
+  })();
+  let rows = '';
+  transitions.forEach((t,ti) => {
+    const from = states.find(s=>s.id===t.from)?.label||'?';
+    const to = states.find(s=>s.id===t.to)?.label||'?';
+    t.rules.forEach((r,ri) => {
+      rows += `<tr data-tid="${t.id}" data-ri="${ri}" ${rt&&rt.lastTransId===t.id?'class="active-row"':''}>
+        <td><input value="${from}" onchange="tableEditFrom('${t.id}',this.value)"/></td>
+        <td><input value="${to}" onchange="tableEditTo('${t.id}',this.value)"/></td>`;
+      for (let i=0;i<cfg.tapes;i++) {
+        const read = (r.read[i]!==undefined?r.read[i]:'B');
+        const write = (r.write[i]!==undefined?r.write[i]:'B');
+        const move = (r.move[i]!==undefined?r.move[i]:'R');
+        rows += `<td><input value="${read}" onchange="tableEditRule('${t.id}',${ri},${i},'read',this.value)"/></td>
+                 <td><input value="${write}" onchange="tableEditRule('${t.id}',${ri},${i},'write',this.value)"/></td>
+                 <td><input value="${move}" onchange="tableEditRule('${t.id}',${ri},${i},'move',this.value)"/></td>`;
+      }
+      rows += `<td><button class="del-btn" onclick="deleteTransRuleFromTable('${t.id}',${ri})">✕</button></td></tr>`;
+    });
+  });
+  container.innerHTML = `<table class="trans-table"><thead>${thead}</thead><tbody>${rows}</tbody></table>`;
+}
+
+function tableEditFrom(tid, val) {
+  const t = transitions.find(t=>t.id===tid);
+  const s = states.find(s=>s.label===val.trim());
+  if (s) { t.from = s.id; renderDiagram(); }
+}
+function tableEditTo(tid, val) {
+  const t = transitions.find(t=>t.id===tid);
+  const s = states.find(s=>s.label===val.trim());
+  if (s) { t.to = s.id; renderDiagram(); }
+}
+function tableEditRule(tid, ri, tapeIdx, field, val) {
+  const t = transitions.find(tr=>tr.id===tid);
+  if (!t || !t.rules[ri]) return;
+  const r = t.rules[ri];
+  const arr = val.replace(/[\[\]]/g,'').split(',').map(x=>x.trim());
+  r[field === 'read' ? 'read' : field === 'write' ? 'write' : 'move'][tapeIdx] = arr[0];
+  renderDiagram();
+}
+function deleteTransRuleFromTable(tid, ri) {
+  const t = transitions.find(tr=>tr.id===tid);
+  if (!t) return;
+  t.rules.splice(ri,1);
+  if (t.rules.length===0) transitions = transitions.filter(tr=>tr.id!==tid);
+  renderDiagram(); syncTableFromDiagram();
+}
+function addTransitionRow() {
+  const stateLabels = states.map(s=>s.label);
+  if (stateLabels.length < 2) { alert('Add at least 2 states first.'); return; }
+  const from = stateLabels[0], to = stateLabels[1] || stateLabels[0];
+  const fromS = states.find(s=>s.label===from), toS = states.find(s=>s.label===to);
+  const rules = [];
+  for (let i=0;i<cfg.tapes;i++) rules.push({read:['B'],write:['B'],move:['R']});
+  const existing = transitions.find(t=>t.from===fromS?.id && t.to===toS?.id);
+  if (existing) existing.rules.push(rules[0]);
+  else transitions.push({id:'t'+(nextTransId++), from:fromS?.id, to:toS?.id, rules});
+  renderDiagram(); syncTableFromDiagram();
+}
+
+// ============================================================
+// TM RUNTIME ENGINE
+// ============================================================
+function runInit() {
+  const input = document.getElementById('run-input').value;
+  const initState = states.find(s=>s.initial);
+  if (!initState) { alert('Mark an initial state first (▶ tool).'); return; }
+  rt = {
+    state: initState.label,
+    step: 0,
+    halted: false,
+    result: null,
+    lastTransId: null,
+    tapes: [],
+    heads: [],
+    writtenCells: []
+  };
+  // init tapes
+  const prefix = cfg.tape1Prefix || '';
+  for (let i=0; i<cfg.tapes; i++) {
+    let tape;
+    if (i===0) {
+      // tape 0: optional prefix chars + input + blanks
+      tape = [...prefix, ...input].concat(Array(30).fill('B'));
+    } else {
+      tape = Array(32).fill('B');
+    }
+    rt.tapes.push(tape);
+    // heads per tape — start after prefix
+    const hs = [];
+    for (let h=0; h<cfg.heads; h++) {
+      if (i===0 && h===1) hs.push(Math.max(0, prefix.length + input.length - 1));
+      else hs.push(prefix.length > 0 && i===0 ? prefix.length : 0);
+    }
+    rt.heads.push(hs);
+    rt.writtenCells.push(new Set());
+  }
+  document.getElementById('step-log').innerHTML = '';
+  addLog('⏮', 'Machine loaded. Initial state: ' + initState.label + ' | Input: "' + input + '"');
+  updateStatusDot('running');
+  renderRunUI();
+  renderDiagram();
+  renderCompare();
+}
+
+function runStep() {
+  if (!rt) { runInit(); return; }
+  if (rt.halted) return;
+
+  const curState = states.find(s=>s.label===rt.state);
+  if (!curState) { rt.halted=true; rt.result='reject'; renderRunUI(); renderDiagram(); return; }
+
+  // check accept/reject
+  if (curState.type==='accept') { rt.halted=true; rt.result='accept'; finishRun(); return; }
+  if (curState.type==='reject') { rt.halted=true; rt.result='reject'; finishRun(); return; }
+
+  // find matching transition
+  const outTrans = transitions.filter(t=>t.from===curState.id);
+  let matched = null, matchedRule = null;
+  outer: for (const t of outTrans) {
+    for (const r of t.rules) {
+      let match = true;
+      for (let i=0;i<cfg.tapes;i++) {
+        const headPos = rt.heads[i][0];
+        const sym = rt.tapes[i][headPos] || 'B';
+        const expected = r.read[i] !== undefined ? r.read[i] : 'B';
+        if (expected !== '*' && expected !== sym) { match=false; break; }
+      }
+      if (match) { matched=t; matchedRule=r; break outer; }
+    }
+  }
+
+  if (!matched) {
+    rt.halted=true; rt.result='reject';
+    addLog(rt.step,'No matching transition from '+rt.state+' — REJECT');
+    finishRun(); return;
+  }
+
+  rt.step++;
+  rt.lastTransId = matched.id;
+  const toState = states.find(s=>s.id===matched.to);
+
+  // apply writes and moves
+  let logParts = [];
+  for (let i=0;i<cfg.tapes;i++) {
+    const hp = rt.heads[i][0];
+    const oldSym = rt.tapes[i][hp]||'B';
+    const newSym = matchedRule.write[i] !== undefined ? matchedRule.write[i] : oldSym;
+    const mv = matchedRule.move[i] !== undefined ? matchedRule.move[i].toUpperCase() : 'S';
+    rt.tapes[i][hp] = newSym;
+    if (newSym !== 'B') rt.writtenCells[i].add(hp);
+    if (mv==='R') rt.heads[i][0]++;
+    else if (mv==='L') rt.heads[i][0] = Math.max(0, rt.heads[i][0]-1);
+    if (rt.tapes[i].length - rt.heads[i][0] < 10) rt.tapes[i].push(...Array(10).fill('B'));
+    logParts.push(`T${i+1}:[${oldSym}→${newSym}/${mv}]`);
+  }
+  rt.state = toState?.label || '?';
+  addLog(rt.step, rt.state + ' ' + logParts.join(' '));
+
+  if (toState?.type==='accept') { rt.halted=true; rt.result='accept'; finishRun(); return; }
+  if (toState?.type==='reject') { rt.halted=true; rt.result='reject'; finishRun(); return; }
+
+  renderRunUI();
+  renderDiagram();
+  renderCompare();
+}
+
+function finishRun() {
+  clearInterval(playInterval); playInterval = null;
+  document.getElementById('play-btn').textContent = '▶ Play';
+  const msg = rt.result==='accept' ? '✓ ACCEPTED' : '✗ REJECTED';
+  addLog('—', msg + ' after ' + rt.step + ' steps');
+  updateStatusDot(rt.result==='accept'?'accepted':'rejected');
+  renderRunUI();
+  renderDiagram();
+  renderCompare();
+}
+
+let playInterval = null;
+function togglePlay() {
+  if (!rt) { runInit(); return; }
+  if (rt.halted) return;
+  if (playInterval) {
+    clearInterval(playInterval); playInterval = null;
+    document.getElementById('play-btn').textContent = '▶ Play';
+  } else {
+    document.getElementById('play-btn').textContent = '⏸ Pause';
+    const speed = 11 - parseInt(document.getElementById('speed-range').value);
+    playInterval = setInterval(() => {
+      runStep();
+      if (rt?.halted) { clearInterval(playInterval); playInterval=null; document.getElementById('play-btn').textContent='▶ Play'; }
+    }, speed * 70);
+  }
+}
+
+function runReset() {
+  clearInterval(playInterval); playInterval=null;
+  document.getElementById('play-btn').textContent='▶ Play';
+  rt = null;
+  updateStatusDot('');
+  document.getElementById('status-text').textContent = 'idle';
+  document.getElementById('cur-state-display').textContent='—';
+  document.getElementById('cur-step-display').textContent='0';
+  document.getElementById('step-log').innerHTML = '<span style="color:var(--text3)">Load machine and run to see execution log.</span>';
+  document.getElementById('tapes-container').innerHTML='';
+  renderDiagram();
+  renderCompare();
+}
+
+function updateStatusDot(state) {
+  const dot = document.getElementById('status-dot');
+  const txt = document.getElementById('status-text');
+  dot.className = 'status-dot ' + (state||'');
+  txt.textContent = state||'idle';
+}
+
+function addLog(step, msg) {
+  const log = document.getElementById('step-log');
+  const div = document.createElement('div');
+  div.innerHTML = `<span class="log-step">${step}</span>  <span class="log-highlight">${msg}</span>`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+// ============================================================
+// RENDER TAPES
+// ============================================================
+function renderRunUI() {
+  if (!rt) return;
+  document.getElementById('cur-state-display').textContent = rt.state || '—';
+  document.getElementById('cur-step-display').textContent = rt.step;
+
+  // halt chip
+  const row = document.getElementById('state-info-row');
+  const existing = row.querySelector('.halt-chip');
+  if (existing) existing.remove();
+  if (rt.halted) {
+    const chip = document.createElement('div');
+    chip.className = 'info-chip halt-chip ' + (rt.result==='accept'?'halt-accept':'halt-reject');
+    chip.textContent = rt.result==='accept'?'✓ ACCEPTED':'✗ REJECTED';
+    row.appendChild(chip);
+  }
+
+  renderTapes();
+}
+
+function renderTapes() {
+  if (!rt) return;
+  const container = document.getElementById('tapes-container');
+  container.innerHTML = '';
+  const badges = ['t0','t1','t2','t2'];
+  for (let i=0; i<cfg.tapes; i++) {
+    const tape = rt.tapes[i];
+    const hp = rt.heads[i][0];
+    const wrap = document.createElement('div');
+    wrap.className = 'tape-wrap';
+    const labelRow = document.createElement('div');
+    labelRow.className = 'tape-label-row';
+    labelRow.innerHTML = `<span class="tape-badge ${badges[i]||'t0'}">Tape ${i+1}</span>
+      <span style="font-size:10px;color:var(--text3)">head@${hp}</span>`;
+    wrap.appendChild(labelRow);
+    const scroller = document.createElement('div');
+    scroller.className = 'tape-scroller';
+    scroller.style.height = '60px';
+    const inner = document.createElement('div');
+    inner.className = 'tape-inner';
+    inner.id = `tape-inner-${i}`;
+    const SHOW = 13;
+    const start = Math.max(0, hp - 4);
+    for (let c = start; c < start + SHOW; c++) {
+      const sym = tape[c] !== undefined ? tape[c] : 'B';
+      const cell = document.createElement('div');
+      cell.className = 'tape-cell' +
+        (c===hp?' head-cell':'') +
+        (sym==='B'?' blank':'') +
+        (rt.writtenCells[i].has(c)&&c!==hp?' written':'');
+      if (c===hp) {
+        const hm = document.createElement('div');
+        hm.className = 'head-marker';
+        hm.textContent = cfg.heads===1?'H':`H1`;
+        cell.appendChild(hm);
+      }
+      const symSpan = document.createElement('span');
+      symSpan.textContent = sym==='B'?'□':sym;
+      cell.appendChild(symSpan);
+      inner.appendChild(cell);
+    }
+    scroller.appendChild(inner);
+    wrap.appendChild(scroller);
+    container.appendChild(wrap);
+  }
+}
+
+// ============================================================
+// COMPARISON ENGINE — independent per-panel controls
+// ============================================================
+
+let cmpSt = null;   // single-tape runtime
+let cmpMt = null;   // multi-tape runtime
+let cmpMtStates = [], cmpMtTransitions = [], cmpMtCfg = {};
+let csInterval = null;  // single-tape play interval
+let cmInterval = null;  // multi-tape play interval
+
+// ---- HARDCODED SINGLE-TAPE MACHINES ----
+
+const ST_PALINDROME = {
+  name: 'Palindrome – 1 tape O(n²)',
+  prepend: '#',
+  startState: 'start',
+  layout: [
+    {label:'start', type:'normal', x:55,  y:80},
+    {label:'seek0', type:'normal', x:170, y:40},
+    {label:'seek1', type:'normal', x:170, y:120},
+    {label:'chk0',  type:'normal', x:300, y:40},
+    {label:'chk1',  type:'normal', x:300, y:120},
+    {label:'gleft', type:'normal', x:410, y:80},
+    {label:'qA',    type:'accept', x:510, y:80},
+    {label:'qR',    type:'reject', x:410, y:150},
+  ],
+  delta: {
+    start: { '0':{w:'E',m:'R',n:'seek0'}, '1':{w:'E',m:'R',n:'seek1'}, 'E':{w:'E',m:'R',n:'start'}, '#':{w:'#',m:'R',n:'start'}, 'B':{w:'B',m:'S',n:'qA'} },
+    seek0: { '0':{w:'0',m:'R',n:'seek0'}, '1':{w:'1',m:'R',n:'seek0'}, 'E':{w:'E',m:'R',n:'seek0'}, 'B':{w:'B',m:'L',n:'chk0'} },
+    seek1: { '0':{w:'0',m:'R',n:'seek1'}, '1':{w:'1',m:'R',n:'seek1'}, 'E':{w:'E',m:'R',n:'seek1'}, 'B':{w:'B',m:'L',n:'chk1'} },
+    chk0:  { '0':{w:'E',m:'L',n:'gleft'}, '1':{w:'1',m:'S',n:'qR'}, 'E':{w:'E',m:'L',n:'chk0'}, '#':{w:'#',m:'S',n:'qA'}, 'B':{w:'B',m:'S',n:'qA'} },
+    chk1:  { '1':{w:'E',m:'L',n:'gleft'}, '0':{w:'0',m:'S',n:'qR'}, 'E':{w:'E',m:'L',n:'chk1'}, '#':{w:'#',m:'S',n:'qA'}, 'B':{w:'B',m:'S',n:'qA'} },
+    gleft: { '0':{w:'0',m:'L',n:'gleft'}, '1':{w:'1',m:'L',n:'gleft'}, 'E':{w:'E',m:'L',n:'gleft'}, 'B':{w:'B',m:'L',n:'gleft'}, '#':{w:'#',m:'R',n:'start'} },
+    qA:{}, qR:{}
+  }
+};
+
+const ST_COPY = {
+  name: 'Copy – 1 tape O(n²)',
+  prepend: '#',
+  startState: 'init',
+  layout: [
+    {label:'init', type:'normal', x:55,  y:80},
+    {label:'ret0', type:'normal', x:155, y:80},
+    {label:'scan', type:'normal', x:255, y:80},
+    {label:'sep0', type:'normal', x:350, y:35},
+    {label:'sep1', type:'normal', x:350, y:120},
+    {label:'end0', type:'normal', x:450, y:35},
+    {label:'end1', type:'normal', x:450, y:120},
+    {label:'back', type:'normal', x:545, y:80},
+    {label:'qA',   type:'accept', x:640, y:80},
+  ],
+  delta: {
+    init: { '0':{w:'0',m:'R',n:'init'}, '1':{w:'1',m:'R',n:'init'}, 'B':{w:'@',m:'L',n:'ret0'} },
+    ret0: { '0':{w:'0',m:'L',n:'ret0'}, '1':{w:'1',m:'L',n:'ret0'}, '#':{w:'#',m:'R',n:'scan'} },
+    scan: { '0':{w:'E',m:'R',n:'sep0'}, '1':{w:'E',m:'R',n:'sep1'}, 'E':{w:'E',m:'R',n:'scan'}, '@':{w:'@',m:'S',n:'qA'} },
+    sep0: { '0':{w:'0',m:'R',n:'sep0'}, '1':{w:'1',m:'R',n:'sep0'}, 'E':{w:'E',m:'R',n:'sep0'}, '@':{w:'@',m:'R',n:'end0'} },
+    sep1: { '0':{w:'0',m:'R',n:'sep1'}, '1':{w:'1',m:'R',n:'sep1'}, 'E':{w:'E',m:'R',n:'sep1'}, '@':{w:'@',m:'R',n:'end1'} },
+    end0: { '0':{w:'0',m:'R',n:'end0'}, '1':{w:'1',m:'R',n:'end0'}, 'B':{w:'0',m:'L',n:'back'} },
+    end1: { '0':{w:'0',m:'R',n:'end1'}, '1':{w:'1',m:'R',n:'end1'}, 'B':{w:'1',m:'L',n:'back'} },
+    back: { '0':{w:'0',m:'L',n:'back'}, '1':{w:'1',m:'L',n:'back'}, '@':{w:'@',m:'L',n:'back'}, 'E':{w:'E',m:'L',n:'back'}, '#':{w:'#',m:'R',n:'scan'} },
+    qA:{}
+  }
+};
+
+const ST_MACHINES = { palindrome: ST_PALINDROME, copy: ST_COPY };
+
+// ---- INIT / CLONE ----
+function cmpMakeStRuntime(input) {
+  const m = ST_MACHINES[currentExampleKey];
+  if (!m) return null;
+  const pre = m.prepend || '';
+  const tape = [...pre, ...input, ...Array(40).fill('B')];
+  return { state: m.startState, tape, head: pre.length, step: 0, halted: false, result: null, written: new Set() };
+}
+
+function cmpMakeMtRuntime(input) {
+  const initS = states.find(s=>s.initial);
+  if (!initS || states.length===0) return null;
+  const prefix = cfg.tape1Prefix || '';
+  const rt = { state: initS.label, step:0, halted:false, result:null, lastTransId:null, tapes:[], heads:[], writtenCells:[] };
+  cmpMtStates = states.map(s=>({...s}));
+  cmpMtTransitions = transitions.map(t=>({...t, rules:t.rules.map(r=>({read:[...r.read],write:[...r.write],move:[...r.move]}))}));
+  cmpMtCfg = {...cfg};
+  for (let i=0;i<cfg.tapes;i++) {
+    const tape = i===0 ? [...prefix,...input,...Array(40).fill('B')] : Array(42).fill('B');
+    rt.tapes.push(tape);
+    rt.heads.push([prefix.length>0&&i===0?prefix.length:0]);
+    rt.writtenCells.push(new Set());
+  }
+  return rt;
+}
+
+// ---- STEP ENGINES ----
+function doStStep() {
+  if (!cmpSt || cmpSt.halted) return;
+  const m = ST_MACHINES[currentExampleKey]; if (!m) return;
+  const sl = m.layout.find(s=>s.label===cmpSt.state);
+  if (!sl) { cmpSt.halted=true; cmpSt.result='reject'; return; }
+  if (sl.type==='accept') { cmpSt.halted=true; cmpSt.result='accept'; return; }
+  if (sl.type==='reject') { cmpSt.halted=true; cmpSt.result='reject'; return; }
+  const sym = cmpSt.tape[cmpSt.head] ?? 'B';
+  const tr = m.delta[cmpSt.state]?.[sym];
+  if (!tr) { cmpSt.halted=true; cmpSt.result='reject'; return; }
+  cmpSt.tape[cmpSt.head] = tr.w;
+  if (tr.w!=='B') cmpSt.written.add(cmpSt.head);
+  if (tr.m==='R') cmpSt.head++;
+  else if (tr.m==='L') cmpSt.head=Math.max(0,cmpSt.head-1);
+  cmpSt.state = tr.n;
+  cmpSt.step++;
+  while (cmpSt.tape.length <= cmpSt.head+8) cmpSt.tape.push('B');
+  const ns = m.layout.find(s=>s.label===cmpSt.state);
+  if (ns?.type==='accept') { cmpSt.halted=true; cmpSt.result='accept'; }
+  if (ns?.type==='reject') { cmpSt.halted=true; cmpSt.result='reject'; }
+}
+
+function doMtStep() {
+  if (!cmpMt || cmpMt.halted) return;
+  const st = cmpMtStates.find(s=>s.label===cmpMt.state);
+  if (!st) { cmpMt.halted=true; cmpMt.result='reject'; return; }
+  if (st.type==='accept') { cmpMt.halted=true; cmpMt.result='accept'; return; }
+  if (st.type==='reject') { cmpMt.halted=true; cmpMt.result='reject'; return; }
+  const out = cmpMtTransitions.filter(t=>t.from===st.id);
+  let matched=null, rule=null;
+  outer: for (const t of out) {
+    for (const r of t.rules) {
+      let ok=true;
+      for (let i=0;i<cmpMtCfg.tapes;i++) {
+        const hp=cmpMt.heads[i][0], sym=cmpMt.tapes[i][hp]||'B';
+        const exp=r.read[i]??'B';
+        if (exp!=='*'&&exp!==sym){ok=false;break;}
+      }
+      if(ok){matched=t;rule=r;break outer;}
+    }
+  }
+  if (!matched) { cmpMt.halted=true; cmpMt.result='reject'; return; }
+  cmpMt.step++;
+  cmpMt.lastTransId=matched.id;
+  const toSt=cmpMtStates.find(s=>s.id===matched.to);
+  for (let i=0;i<cmpMtCfg.tapes;i++) {
+    const hp=cmpMt.heads[i][0];
+    const nw=rule.write[i]??cmpMt.tapes[i][hp]??'B';
+    const mv=(rule.move[i]||'S').toUpperCase();
+    cmpMt.tapes[i][hp]=nw;
+    if(nw!=='B') cmpMt.writtenCells[i].add(hp);
+    if(mv==='R') cmpMt.heads[i][0]++;
+    else if(mv==='L') cmpMt.heads[i][0]=Math.max(0,cmpMt.heads[i][0]-1);
+    while(cmpMt.tapes[i].length-cmpMt.heads[i][0]<8) cmpMt.tapes[i].push('B');
+  }
+  cmpMt.state=toSt?.label||'?';
+  const ns=cmpMtStates.find(s=>s.label===cmpMt.state);
+  if(ns?.type==='accept'){cmpMt.halted=true;cmpMt.result='accept';}
+  if(ns?.type==='reject'){cmpMt.halted=true;cmpMt.result='reject';}
+}
+
+// ---- INIT BOTH ----
+function cmpRunBoth() {
+  const input = document.getElementById('cmp-input').value;
+  cmpSt = cmpMakeStRuntime(input);
+  cmpMt = cmpMakeMtRuntime(input);
+  // stop any playing
+  clearInterval(csInterval); csInterval=null; document.getElementById('cs-play-btn').textContent='▶'; document.getElementById('cs-play-btn').classList.remove('play-active');
+  clearInterval(cmInterval); cmInterval=null; document.getElementById('cm-play-btn').textContent='▶'; document.getElementById('cm-play-btn').classList.remove('play-active');
+  cmpRenderLeft(); cmpRenderRight(); cmpUpdateInsight();
+}
+
+// ---- SINGLE-TAPE CONTROLS ----
+function cmpStRestart() {
+  clearInterval(csInterval); csInterval=null;
+  document.getElementById('cs-play-btn').textContent='▶'; document.getElementById('cs-play-btn').classList.remove('play-active');
+  cmpSt = cmpMakeStRuntime(document.getElementById('cmp-input').value);
+  cmpRenderLeft(); cmpUpdateInsight();
+}
+function cmpStReset() {
+  clearInterval(csInterval); csInterval=null;
+  document.getElementById('cs-play-btn').textContent='▶'; document.getElementById('cs-play-btn').classList.remove('play-active');
+  cmpSt = null; cmpRenderLeft(); cmpUpdateInsight();
+}
+function cmpStStep() {
+  if (!cmpSt) { cmpSt=cmpMakeStRuntime(document.getElementById('cmp-input').value); }
+  doStStep(); cmpRenderLeft(); cmpUpdateInsight();
+  if (cmpSt?.halted) { clearInterval(csInterval); csInterval=null; document.getElementById('cs-play-btn').textContent='▶'; document.getElementById('cs-play-btn').classList.remove('play-active'); }
+}
+function cmpStTogglePlay() {
+  if (csInterval) {
+    clearInterval(csInterval); csInterval=null;
+    document.getElementById('cs-play-btn').textContent='▶'; document.getElementById('cs-play-btn').classList.remove('play-active');
+    return;
+  }
+  if (!cmpSt) cmpSt=cmpMakeStRuntime(document.getElementById('cmp-input').value);
+  if (cmpSt?.halted) return;
+  document.getElementById('cs-play-btn').textContent='⏸'; document.getElementById('cs-play-btn').classList.add('play-active');
+  const spd = 11 - parseInt(document.getElementById('cs-speed').value);
+  csInterval = setInterval(()=>{
+    doStStep(); cmpRenderLeft(); cmpUpdateInsight();
+    if (cmpSt?.halted) { clearInterval(csInterval); csInterval=null; document.getElementById('cs-play-btn').textContent='▶'; document.getElementById('cs-play-btn').classList.remove('play-active'); }
+  }, spd*65);
+}
+
+// ---- MULTI-TAPE CONTROLS ----
+function cmpMtRestart() {
+  clearInterval(cmInterval); cmInterval=null;
+  document.getElementById('cm-play-btn').textContent='▶'; document.getElementById('cm-play-btn').classList.remove('play-active');
+  cmpMt = cmpMakeMtRuntime(document.getElementById('cmp-input').value);
+  cmpRenderRight(); cmpUpdateInsight();
+}
+function cmpMtReset() {
+  clearInterval(cmInterval); cmInterval=null;
+  document.getElementById('cm-play-btn').textContent='▶'; document.getElementById('cm-play-btn').classList.remove('play-active');
+  cmpMt = null; cmpRenderRight(); cmpUpdateInsight();
+}
+function cmpMtStep() {
+  if (!cmpMt) { cmpMt=cmpMakeMtRuntime(document.getElementById('cmp-input').value); }
+  doMtStep(); cmpRenderRight(); cmpUpdateInsight();
+  if (cmpMt?.halted) { clearInterval(cmInterval); cmInterval=null; document.getElementById('cm-play-btn').textContent='▶'; document.getElementById('cm-play-btn').classList.remove('play-active'); }
+}
+function cmpMtTogglePlay() {
+  if (cmInterval) {
+    clearInterval(cmInterval); cmInterval=null;
+    document.getElementById('cm-play-btn').textContent='▶'; document.getElementById('cm-play-btn').classList.remove('play-active');
+    return;
+  }
+  if (!cmpMt) cmpMt=cmpMakeMtRuntime(document.getElementById('cmp-input').value);
+  if (cmpMt?.halted) return;
+  document.getElementById('cm-play-btn').textContent='⏸'; document.getElementById('cm-play-btn').classList.add('play-active');
+  const spd = 11 - parseInt(document.getElementById('cm-speed').value);
+  cmInterval = setInterval(()=>{
+    doMtStep(); cmpRenderRight(); cmpUpdateInsight();
+    if (cmpMt?.halted) { clearInterval(cmInterval); cmInterval=null; document.getElementById('cm-play-btn').textContent='▶'; document.getElementById('cm-play-btn').classList.remove('play-active'); }
+  }, spd*65);
+}
+
+// ---- RENDER LEFT (single-tape) ----
+function cmpRenderLeft() {
+  const m = ST_MACHINES[currentExampleKey];
+  // badges
+  document.getElementById('cs-state').textContent = cmpSt?.state||'—';
+  document.getElementById('cs-steps').textContent = cmpSt?.step||0;
+  const sb = document.getElementById('cs-status');
+  if (!cmpSt) { sb.className='cp-badge b-idle'; sb.textContent='idle'; }
+  else if (cmpSt.halted) { sb.className='cp-badge '+(cmpSt.result==='accept'?'b-acc':'b-rej'); sb.textContent=cmpSt.result==='accept'?'✓ accepted':'✗ rejected'; }
+  else { sb.className='cp-badge b-run'; sb.textContent='running'; }
+
+  // tape
+  const ta = document.getElementById('cs-tape-area');
+  if (!cmpSt || !m) {
+    ta.innerHTML = `<div class="cp-empty">${!m?'Load <strong>Copy</strong> or <strong>Palindrome</strong> from the examples menu first.':'Click ⏮ or Step to begin.'}</div>`;
+  } else {
+    ta.innerHTML = `<div class="cp-tape-wrap"><div class="cp-tape-lbl">Tape 1 <span class="head-at">head@${cmpSt.head}</span></div>${buildCpTape(cmpSt.tape, cmpSt.head, cmpSt.written)}</div>`;
+  }
+
+  // diagram
+  const diag = document.getElementById('cs-diagram');
+  if (m) {
+    const edges = buildStEdgeList(m);
+    diag.innerHTML='';
+    diag.appendChild(buildMiniSvg(m.layout, edges, cmpSt?.state||null, cmpSt?.halted?cmpSt.result:null, 700, 180));
+  } else { diag.innerHTML='<div style="font-size:10px;color:var(--text3);padding:10px">No single-tape machine available for this example.</div>'; }
+
+  // stats
+  const cells = cmpSt ? cmpSt.tape.filter(c=>c!=='B').length : 0;
+  document.getElementById('cs-stat-steps').textContent = cmpSt?.step||0;
+  document.getElementById('cs-stat-cells').textContent = cells;
+}
+
+// ---- RENDER RIGHT (multi-tape) ----
+function cmpRenderRight() {
+  // badges
+  document.getElementById('cm-state').textContent = cmpMt?.state||'—';
+  document.getElementById('cm-steps').textContent = cmpMt?.step||0;
+  const mb = document.getElementById('cm-status');
+  if (!cmpMt) { mb.className='cp-badge b-idle'; mb.textContent='idle'; }
+  else if (cmpMt.halted) { mb.className='cp-badge '+(cmpMt.result==='accept'?'b-acc':'b-rej'); mb.textContent=cmpMt.result==='accept'?'✓ accepted':'✗ rejected'; }
+  else { mb.className='cp-badge b-run'; mb.textContent='running'; }
+
+  // tapes
+  const ta = document.getElementById('cm-tape-area');
+  if (!cmpMt) {
+    const msg = states.length===0 ? 'No machine loaded. Draw a machine or load an example first.' : 'Click ⏮ or ▶ Run Both to begin.';
+    ta.innerHTML = `<div class="cp-empty">${msg}</div>`;
+  } else {
+    ta.innerHTML = '';
+    const numT = cmpMtCfg.tapes||1;
+    for (let i=0;i<numT;i++) {
+      const hp = cmpMt.heads[i][0];
+      const wrap = document.createElement('div'); wrap.className='cp-tape-wrap';
+      wrap.innerHTML = `<div class="cp-tape-lbl">Tape ${i+1} <span class="head-at">head@${hp}</span></div>`;
+      wrap.insertAdjacentHTML('beforeend', buildCpTape(cmpMt.tapes[i], hp, cmpMt.writtenCells[i]));
+      ta.appendChild(wrap);
+    }
+  }
+
+  // diagram
+  const diag = document.getElementById('cm-diagram');
+  if (cmpMtStates.length>0) {
+    const SPACING=130, sy=80, sx=60;
+    const layout = cmpMtStates.map((s,i)=>({label:s.label, type:s.type, x:sx+i*SPACING, y:sy, initial:s.initial}));
+    const seen=new Set(), edges=[];
+    cmpMtTransitions.forEach(t=>{
+      const key=t.from+'→'+t.to;
+      const fr=cmpMtStates.find(s=>s.id===t.from), to=cmpMtStates.find(s=>s.id===t.to);
+      if(!fr||!to) return;
+      if(!seen.has(key)){ edges.push({from:fr.label,to:to.label,labels:[]}); seen.add(key); }
+      const e=edges.find(e=>e.from===fr.label&&e.to===to.label);
+      t.rules.forEach(r=>e.labels.push(r.read.join(',')+'→'+r.write.join(',')));
+    });
+    const W=Math.max(400, sx+(cmpMtStates.length-1)*SPACING+90);
+    diag.innerHTML='';
+    const svg=buildMiniSvg(layout, edges, cmpMt?.state||null, cmpMt?.halted?cmpMt.result:null, W, 170);
+    // initial arrow
+    const initL=layout.find(s=>s.initial);
+    if(initL){
+      const defs=svg.querySelector('defs'); // reuse arrowhead marker already in svg
+      const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.setAttribute('x1',String(initL.x-50)); line.setAttribute('y1',String(initL.y));
+      line.setAttribute('x2',String(initL.x-26)); line.setAttribute('y2',String(initL.y));
+      line.setAttribute('stroke','rgba(124,92,252,0.8)'); line.setAttribute('stroke-width','1.5');
+      line.setAttribute('marker-end','url(#svgarrow)');
+      svg.appendChild(line);
+    }
+    diag.appendChild(svg);
+  } else { diag.innerHTML='<div style="font-size:10px;color:var(--text3);padding:10px">Load a machine first.</div>'; }
+
+  // stats
+  const allCells = cmpMt ? cmpMt.tapes.reduce((s,t)=>s+t.filter(c=>c!=='B').length,0) : 0;
+  document.getElementById('cm-stat-steps').textContent = cmpMt?.step||0;
+  document.getElementById('cm-stat-tapes').textContent = cmpMtCfg.tapes||cfg.tapes||'—';
+  document.getElementById('cm-stat-cells').textContent = allCells;
+}
+
+// ---- TAPE HTML BUILDER ----
+function buildCpTape(tape, headPos, written) {
+  const SHOW=16, start=Math.max(0,headPos-5);
+  let html='<div class="cp-tape-row">';
+  for (let c=start;c<start+SHOW;c++) {
+    const sym=tape[c]??'B';
+    const isHead=c===headPos;
+    const isWritten=written instanceof Set ? written.has(c) : false;
+    const cls='cp-cell'+(isHead?' cp-head':isWritten?' cp-written':sym==='B'?' cp-blank':'');
+    const arrow=isHead?'<div class="cp-head-arrow">▼</div>':'';
+    const disp=sym==='B'?'□':sym;
+    html+=`<div class="${cls}">${arrow}${disp}</div>`;
+  }
+  return html+'</div>';
+}
+
+// ---- EDGE LIST FROM ST MACHINE ----
+function buildStEdgeList(machine) {
+  const edges=[], seen=new Set();
+  for (const [from,syms] of Object.entries(machine.delta)) {
+    for (const [sym,tr] of Object.entries(syms)) {
+      const key=from+'→'+tr.n;
+      if(!seen.has(key)){ edges.push({from,to:tr.n,labels:[]}); seen.add(key); }
+      edges.find(e=>e.from===from&&e.to===tr.n).labels.push(`${sym}→${tr.w},${tr.m}`);
+    }
+  }
+  return edges;
+}
+
+// ---- SVG DIAGRAM BUILDER ----
+function buildMiniSvg(layout, edges, activeState, haltResult, W, H) {
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`); svg.setAttribute('height',String(H));
+  // defs
+  const defs=document.createElementNS('http://www.w3.org/2000/svg','defs');
+  const mk=document.createElementNS('http://www.w3.org/2000/svg','marker');
+  mk.setAttribute('id','svgarrow'); mk.setAttribute('markerWidth','7'); mk.setAttribute('markerHeight','5');
+  mk.setAttribute('refX','7'); mk.setAttribute('refY','2.5'); mk.setAttribute('orient','auto');
+  const poly=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+  poly.setAttribute('points','0 0,7 2.5,0 5'); poly.setAttribute('fill','rgba(61,220,132,0.7)');
+  mk.appendChild(poly); defs.appendChild(mk); svg.appendChild(defs);
+
+  const stMap={}; layout.forEach(s=>stMap[s.label]=s);
+
+  // edges
+  edges.forEach(e=>{
+    const fr=stMap[e.from], to=stMap[e.to]; if(!fr||!to) return;
+    const isActive = e.from===activeState;
+    const isSelf=fr===to;
+    let d, lx, ly;
+    if (isSelf) {
+      d=`M ${fr.x-12} ${fr.y-22} Q ${fr.x-2} ${fr.y-58} ${fr.x+12} ${fr.y-22}`;
+      lx=fr.x; ly=fr.y-62;
+    } else {
+      const hasRev=edges.find(r=>r.from===e.to&&r.to===e.from);
+      const bend=hasRev?25:0;
+      const mx=(fr.x+to.x)/2, my=(fr.y+to.y)/2;
+      const dx=to.x-fr.x, dy=to.y-fr.y, len=Math.sqrt(dx*dx+dy*dy)||1;
+      const nx=-dy/len, ny=dx/len;
+      const cpx=mx+nx*bend, cpy=my+ny*bend;
+      const a1=Math.atan2(cpy-to.y,cpx-to.x);
+      const a2=Math.atan2(cpy-fr.y,cpx-fr.x);
+      const R=23;
+      d=`M ${fr.x+Math.cos(a2)*R} ${fr.y+Math.sin(a2)*R} Q ${cpx} ${cpy} ${to.x+Math.cos(a1)*R} ${to.y+Math.sin(a1)*R}`;
+      lx=cpx; ly=cpy-4;
+    }
+    const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d',d); path.setAttribute('fill','none');
+    path.setAttribute('stroke',isActive?'rgba(61,220,132,0.9)':'rgba(61,220,132,0.3)');
+    path.setAttribute('stroke-width',isActive?'2':'1.5');
+    path.setAttribute('marker-end','url(#svgarrow)');
+    svg.appendChild(path);
+    if (e.labels.length) {
+      const txt=document.createElementNS('http://www.w3.org/2000/svg','text');
+      txt.setAttribute('x',String(lx)); txt.setAttribute('y',String(ly));
+      txt.setAttribute('text-anchor','middle'); txt.setAttribute('fill','rgba(136,136,170,0.8)');
+      txt.setAttribute('font-family','JetBrains Mono,monospace'); txt.setAttribute('font-size','7.5');
+      // show first 2 labels, condensed
+      const show=e.labels.slice(0,2).join(' ');
+      txt.textContent=show.length>20?show.slice(0,20)+'…':show;
+      svg.appendChild(txt);
+    }
+  });
+
+  // states
+  layout.forEach(s=>{
+    const isActive=s.label===activeState;
+    const haltAcc=s.type==='accept'&&haltResult==='accept';
+    const haltRej=s.type==='reject'&&haltResult==='reject';
+    const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+    // pulsing ring
+    if (isActive) {
+      const ring=document.createElementNS('http://www.w3.org/2000/svg','circle');
+      ring.setAttribute('cx',String(s.x)); ring.setAttribute('cy',String(s.y)); ring.setAttribute('r','28');
+      ring.setAttribute('fill','none'); ring.setAttribute('stroke','rgba(61,220,132,0.3)');
+      ring.setAttribute('stroke-width','2'); ring.setAttribute('stroke-dasharray','4 3');
+      g.appendChild(ring);
+    }
+    const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',String(s.x)); c.setAttribute('cy',String(s.y)); c.setAttribute('r','22');
+    const fill=s.type==='accept'?'rgba(61,220,132,0.12)':s.type==='reject'?'rgba(255,79,106,0.12)':'rgba(26,36,60,0.95)';
+    const stroke=isActive?'#3ddc84':haltAcc?'#3ddc84':haltRej?'#ff4f6a':s.type==='accept'?'rgba(61,220,132,0.55)':s.type==='reject'?'rgba(255,79,106,0.55)':'rgba(61,220,132,0.3)';
+    c.setAttribute('fill',fill); c.setAttribute('stroke',stroke); c.setAttribute('stroke-width',isActive?'2.5':'1.5');
+    g.appendChild(c);
+    if (s.type==='accept') {
+      const inn=document.createElementNS('http://www.w3.org/2000/svg','circle');
+      inn.setAttribute('cx',String(s.x)); inn.setAttribute('cy',String(s.y)); inn.setAttribute('r','17');
+      inn.setAttribute('fill','none'); inn.setAttribute('stroke',haltAcc?'#3ddc84':'rgba(61,220,132,0.4)'); inn.setAttribute('stroke-width','1');
+      g.appendChild(inn);
+    }
+    const txt=document.createElementNS('http://www.w3.org/2000/svg','text');
+    txt.setAttribute('x',String(s.x)); txt.setAttribute('y',String(s.y));
+    txt.setAttribute('text-anchor','middle'); txt.setAttribute('dominant-baseline','middle');
+    txt.setAttribute('font-family','JetBrains Mono,monospace'); txt.setAttribute('font-size','9'); txt.setAttribute('font-weight','500');
+    txt.setAttribute('fill',s.type==='accept'?'#3ddc84':s.type==='reject'?'#ff4f6a':'#e8e8f0');
+    txt.textContent=s.label;
+    g.appendChild(txt);
+    svg.appendChild(g);
+  });
+  return svg;
+}
+
+// ---- INSIGHT ----
+function updateCmpInsight() {
+  const el=document.getElementById('cmp-insight-bar');
+  const m=ST_MACHINES[currentExampleKey];
+  const ss=cmpSt?.step||0, ms=cmpMt?.step||0;
+  const n=document.getElementById('cmp-input').value.length||1;
+  if (!m) {
+    el.innerHTML='💡 <strong>How to use:</strong> Load <strong>Copy</strong> or <strong>Palindrome</strong> from the examples menu, type an input, then click <strong>▶ Run Both</strong>.'; return;
+  }
+  if (cmpSt?.halted && cmpMt?.halted) {
+    const ratio=ms>0?(ss/ms).toFixed(1):'∞';
+    el.innerHTML=`💡 <strong>Result:</strong> For input length n=${n} — single-tape: <span class="hl-red">${ss} steps</span>, multi-tape: <span class="hl-green">${ms} steps</span> — real speedup: <span class="hl-teal">${ratio}×</span>. The single-tape machine scans back and forth (O(n²)), while the multi-tape machine works in a linear pass (O(n)).`;
+  } else {
+    el.innerHTML=`💡 <strong>Insight:</strong> The single-tape machine must scan back and forth for each symbol (O(n²)), while the multi-tape machine copies in a single pass (O(n)). Run both to completion and compare step counts! — current: <span class="hl-red">${ss}</span> vs <span class="hl-green">${ms}</span> steps.`;
+  }
+}
+
+function renderCompare() { /* handled by overlay */ }
+function cmpLoad() { cmpRunBoth(); }
+
+// ============================================================
+// TAB SWITCHING
+// ============================================================
+function switchTab(tab) {
+  ['run','table','compare'].forEach(t => {
+    document.getElementById('pane-'+t).style.display = t===tab?'block':'none';
+    document.getElementById('tab-'+t).classList.toggle('active', t===tab);
+  });
+  const overlay = document.getElementById('cmp-overlay');
+  if (tab==='compare') {
+    overlay.classList.add('open');
+    document.getElementById('cmp-input').value = document.getElementById('run-input').value;
+    updateCmpInsight();
+    cmpRenderLeft(); cmpRenderRight();
+  } else {
+    overlay.classList.remove('open');
+    clearInterval(csInterval); csInterval=null;
+    clearInterval(cmInterval); cmInterval=null;
+    document.getElementById('cs-play-btn').textContent='▶'; document.getElementById('cs-play-btn').classList.remove('play-active');
+    document.getElementById('cm-play-btn').textContent='▶'; document.getElementById('cm-play-btn').classList.remove('play-active');
+  }
+  if (tab==='table') syncTableFromDiagram();
+}
+
+// ============================================================
+// CONFIG
+// ============================================================
+function applyConfig() {
+  cfg.tapes = parseInt(document.getElementById('tape-count').value)||1;
+  cfg.heads = parseInt(document.getElementById('head-count').value)||1;
+  transitions = [];
+  renderDiagram();
+  syncTableFromDiagram();
+  renderCompare();
+}
+
+// ============================================================
+// EXAMPLES
+// ============================================================
+const EXAMPLES = {
+  copy: {
+    tapes: 2, heads: 1,
+    states: [
+      {label:'q0',type:'initial',x:150,y:220,initial:true},
+      {label:'q1',type:'normal',x:320,y:220,initial:false},
+      {label:'qA',type:'accept',x:490,y:220,initial:false}
+    ],
+    transitions: [
+      {from:'q0',to:'q1',rules:[{read:['0'],write:['0','0'],move:['R','R']}]},
+      {from:'q0',to:'q1',rules:[{read:['1'],write:['1','1'],move:['R','R']}]},
+      {from:'q1',to:'q1',rules:[{read:['0'],write:['0','0'],move:['R','R']}]},
+      {from:'q1',to:'q1',rules:[{read:['1'],write:['1','1'],move:['R','R']}]},
+      {from:'q1',to:'qA',rules:[{read:['B'],write:['B','B'],move:['S','S']}]},
+    ]
+  },
+  palindrome: {
+    tapes: 2, heads: 1,
+    // tape1 is pre-loaded with '#' at pos 0 as left-end marker; input starts at pos 1
+    tape1Prefix: '#',
+    states: [
+      {label:'qC',type:'initial',x:100,y:220,initial:true},
+      {label:'qW',type:'normal',x:280,y:220,initial:false},
+      {label:'qK',type:'normal',x:460,y:220,initial:false},
+      {label:'qA',type:'accept',x:460,y:120,initial:false},
+      {label:'qR',type:'reject',x:280,y:120,initial:false}
+    ],
+    // Phase qC: copy tape1→tape2, both R. On B→qW (both L one step)
+    // Phase qW: rewind tape1 L only (tape2 stays). On #→qK (tape1 R, tape2 S)
+    // Phase qK: compare tape1 R, tape2 L. Match→stay. Both-exhausted→qA. Mismatch→qR.
+    transitions: [
+      {from:'qC',to:'qC',rules:[{read:['0','B'],write:['0','0'],move:['R','R']}]},
+      {from:'qC',to:'qC',rules:[{read:['1','B'],write:['1','1'],move:['R','R']}]},
+      {from:'qC',to:'qW',rules:[{read:['B','B'],write:['B','B'],move:['L','L']}]},
+      {from:'qW',to:'qW',rules:[{read:['0','B'],write:['0','B'],move:['L','S']}]},
+      {from:'qW',to:'qW',rules:[{read:['1','B'],write:['1','B'],move:['L','S']}]},
+      {from:'qW',to:'qK',rules:[{read:['#','B'],write:['#','B'],move:['R','S']}]},
+      {from:'qK',to:'qK',rules:[{read:['0','0'],write:['0','0'],move:['R','L']}]},
+      {from:'qK',to:'qK',rules:[{read:['1','1'],write:['1','1'],move:['R','L']}]},
+      {from:'qK',to:'qA',rules:[{read:['B','B'],write:['B','B'],move:['S','S']}]},
+      {from:'qK',to:'qA',rules:[{read:['B','0'],write:['B','0'],move:['S','S']}]},
+      {from:'qK',to:'qA',rules:[{read:['B','1'],write:['B','1'],move:['S','S']}]},
+      {from:'qK',to:'qR',rules:[{read:['0','1'],write:['0','1'],move:['S','S']}]},
+      {from:'qK',to:'qR',rules:[{read:['1','0'],write:['1','0'],move:['S','S']}]},
+    ]
+  },
+  increment: {
+    tapes: 1, heads: 1,
+    states: [
+      {label:'q0',type:'initial',x:150,y:220,initial:true},
+      {label:'q1',type:'normal',x:320,y:220,initial:false},
+      {label:'qA',type:'accept',x:490,y:220,initial:false}
+    ],
+    transitions: [
+      {from:'q0',to:'q0',rules:[{read:['0'],write:['0'],move:['R']}]},
+      {from:'q0',to:'q0',rules:[{read:['1'],write:['1'],move:['R']}]},
+      {from:'q0',to:'q1',rules:[{read:['B'],write:['B'],move:['L']}]},
+      {from:'q1',to:'q1',rules:[{read:['1'],write:['0'],move:['L']}]},
+      {from:'q1',to:'qA',rules:[{read:['0'],write:['1'],move:['S']}]},
+      {from:'q1',to:'qA',rules:[{read:['B'],write:['1'],move:['S']}]},
+    ]
+  },
+  accept_all: {
+    tapes: 1, heads: 1,
+    states: [
+      {label:'q0',type:'initial',x:200,y:220,initial:true},
+      {label:'qA',type:'accept',x:400,y:220,initial:false}
+    ],
+    transitions: [
+      {from:'q0',to:'qA',rules:[{read:['*'],write:['B'],move:['R']}]},
+    ]
+  }
+};
+
+function loadExample(key) {
+  if (!key) return;
+  const ex = EXAMPLES[key];
+  if (!ex) return;
+  cfg.tapes = ex.tapes; cfg.heads = ex.heads;
+  cfg.tape1Prefix = ex.tape1Prefix || '';
+  document.getElementById('tape-count').value = ex.tapes;
+  document.getElementById('head-count').value = ex.heads;
+  states = []; transitions = []; nextStateId=0; nextTransId=0;
+  rt = null; currentExampleKey = key;
+  const idMap = {};
+  ex.states.forEach((sd,i) => {
+    const id = 's'+(nextStateId++);
+    idMap[sd.label] = id;
+    states.push({id, label:sd.label, x:sd.x, y:sd.y, type:sd.type==='initial'?'normal':sd.type, initial:sd.initial});
+  });
+  ex.transitions.forEach(td => {
+    const existing = transitions.find(t=>t.from===idMap[td.from]&&t.to===idMap[td.to]);
+    if (existing) existing.rules.push(...td.rules);
+    else transitions.push({id:'t'+(nextTransId++), from:idMap[td.from], to:idMap[td.to], rules:[...td.rules]});
+  });
+  runReset();
+  renderDiagram();
+  syncTableFromDiagram();
+  renderCompare();
+  document.getElementById('example-select').value='';
+}
+
+function resetAll() {
+  states=[]; transitions=[]; nextStateId=0; nextTransId=0; rt=null;
+  cfg.tape1Prefix = '';
+  runReset();
+  renderDiagram();
+  syncTableFromDiagram();
+  renderCompare();
+}
+
+// ============================================================
+// SAVE / LOAD SYSTEM
+// ============================================================
+const STORAGE_KEY = 'tm_playground_saves';
+
+function getMachineSnapshot(name) {
+  return {
+    name: name || 'untitled',
+    savedAt: new Date().toISOString(),
+    cfg: { tapes: cfg.tapes, heads: cfg.heads, tape1Prefix: cfg.tape1Prefix || '' },
+    states: states.map(s => ({ ...s })),
+    transitions: transitions.map(t => ({
+      id: t.id, from: t.from, to: t.to,
+      rules: t.rules.map(r => ({ read: [...r.read], write: [...r.write], move: [...r.move] }))
+    })),
+    nextStateId, nextTransId
+  };
+}
+
+function getAllSaves() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+  catch(e) { return []; }
+}
+
+function putAllSaves(saves) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(saves));
+}
+
+function saveMachine() {
+  const name = document.getElementById('save-name-input').value.trim();
+  if (!name) { showToast('Enter a name first.'); return; }
+  if (states.length === 0) { showToast('Nothing to save — add some states first.'); return; }
+  const saves = getAllSaves();
+  const existing = saves.findIndex(s => s.name === name);
+  const snap = getMachineSnapshot(name);
+  if (existing >= 0) saves[existing] = snap;
+  else saves.unshift(snap);
+  putAllSaves(saves);
+  renderSavedList();
+  document.getElementById('save-name-input').value = '';
+  showToast('Saved: ' + name);
+}
+
+function loadSave(name) {
+  const saves = getAllSaves();
+  const snap = saves.find(s => s.name === name);
+  if (!snap) return;
+  restoreSnapshot(snap);
+  showToast('Loaded: ' + name);
+  toggleDrawer();
+}
+
+function deleteSave(name) {
+  const saves = getAllSaves().filter(s => s.name !== name);
+  putAllSaves(saves);
+  renderSavedList();
+  showToast('Deleted: ' + name);
+}
+
+function restoreSnapshot(snap) {
+  cfg.tapes = snap.cfg.tapes;
+  cfg.heads = snap.cfg.heads;
+  cfg.tape1Prefix = snap.cfg.tape1Prefix || '';
+  document.getElementById('tape-count').value = cfg.tapes;
+  document.getElementById('head-count').value = cfg.heads;
+  states = snap.states.map(s => ({ ...s }));
+  transitions = snap.transitions.map(t => ({
+    id: t.id, from: t.from, to: t.to,
+    rules: t.rules.map(r => ({ read: [...r.read], write: [...r.write], move: [...r.move] }))
+  }));
+  nextStateId = snap.nextStateId;
+  nextTransId = snap.nextTransId;
+  rt = null;
+  runReset();
+  renderDiagram();
+  syncTableFromDiagram();
+  renderCompare();
+}
+
+function renderSavedList() {
+  const saves = getAllSaves();
+  const container = document.getElementById('saved-list');
+  if (saves.length === 0) {
+    container.innerHTML = '<div class="empty-list">No saved machines yet.</div>';
+    return;
+  }
+  container.innerHTML = saves.map(s => {
+    const d = new Date(s.savedAt);
+    const when = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const stateCount = s.states?.length || 0;
+    const transCount = s.transitions?.length || 0;
+    return `<div class="saved-item">
+      <div class="saved-item-info">
+        <div class="saved-item-name" title="${s.name}">${s.name}</div>
+        <div class="saved-item-meta">${stateCount} states · ${transCount} transitions · ${when}</div>
+      </div>
+      <div class="saved-item-actions">
+        <button class="icon-btn load-btn" title="Load" onclick="loadSave('${s.name.replace(/'/g,"\\'")}')" >↩</button>
+        <button class="icon-btn del-btn" title="Delete" onclick="deleteSave('${s.name.replace(/'/g,"\\'")}')" >✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function exportJSON() {
+  if (states.length === 0) { showToast('Nothing to export.'); return; }
+  const name = document.getElementById('save-name-input').value.trim()
+    || 'tm_machine_' + Date.now();
+  const snap = getMachineSnapshot(name);
+  const blob = new Blob([JSON.stringify(snap, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name.replace(/[^a-zA-Z0-9_-]/g, '_') + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('Exported: ' + a.download);
+}
+
+function importJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const snap = JSON.parse(e.target.result);
+      if (!snap.states || !snap.transitions || !snap.cfg) throw new Error('Invalid format');
+      restoreSnapshot(snap);
+      // also add to saves list
+      const saves = getAllSaves();
+      const existing = saves.findIndex(s => s.name === snap.name);
+      if (existing >= 0) saves[existing] = snap; else saves.unshift(snap);
+      putAllSaves(saves);
+      renderSavedList();
+      showToast('Imported: ' + snap.name);
+    } catch(err) {
+      showToast('Error: invalid JSON file');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function toggleDrawer() {
+  const drawer = document.getElementById('save-drawer');
+  const isOpen = drawer.classList.toggle('open');
+  if (isOpen) renderSavedList();
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._tid);
+  t._tid = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// init
+renderDiagram();
+syncTableFromDiagram();
+renderCompare();
+
+// hide compare pane initially (show run)
+document.getElementById('pane-compare').style.display='none';
+</script>
+</body>
+</html>

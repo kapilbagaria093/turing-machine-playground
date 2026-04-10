@@ -1,0 +1,13 @@
+{
+  "name": "tm-playground",
+  "version": "1.0.0",
+  "description": "Multi-Tape Turing Machine Simulator",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=14"
+  }
+}
