@@ -2058,11 +2058,14 @@ const EXAMPLES = {
       {from:'qW',to:'qK',rules:[{read:['#','B'],write:['#','B'],move:['R','S']}]},
       {from:'qK',to:'qK',rules:[{read:['0','0'],write:['0','0'],move:['R','L']}]},
       {from:'qK',to:'qK',rules:[{read:['1','1'],write:['1','1'],move:['R','L']}]},
-      {from:'qK',to:'qA',rules:[{read:['B','B'],write:['B','B'],move:['S','S']}]},
-      {from:'qK',to:'qA',rules:[{read:['B','0'],write:['B','0'],move:['S','S']}]},
-      {from:'qK',to:'qA',rules:[{read:['B','1'],write:['B','1'],move:['S','S']}]},
+      // {from:'qK',to:'qA',rules:[{read:['B','B'],write:['B','B'],move:['S','S']}]},
+      // {from:'qK',to:'qA',rules:[{read:['B','0'],write:['B','0'],move:['S','S']}]},
+      // {from:'qK',to:'qA',rules:[{read:['B','1'],write:['B','1'],move:['S','S']}]},
       {from:'qK',to:'qR',rules:[{read:['0','1'],write:['0','1'],move:['S','S']}]},
       {from:'qK',to:'qR',rules:[{read:['1','0'],write:['1','0'],move:['S','S']}]},
+
+      {from:'qK',to:'qA',rules:[{read:['B','B'],write:['B','B'],move:['S','S']},
+]}
     ]
   },
   increment: {
