@@ -2038,7 +2038,6 @@ const EXAMPLES = {
     tapes: 2, heads: 1,
     // tape1 is pre-loaded with '#' at pos 0 as left-end marker; input starts at pos 1
     tape1Prefix: '#',
-    tape2Prefix: '#',
     states: [
       {label:'qC',type:'initial',x:100,y:220,initial:true},
       {label:'qW',type:'normal',x:280,y:220,initial:false},
@@ -2049,54 +2048,43 @@ const EXAMPLES = {
     // Phase qC: copy tape1→tape2, both R. On B→qW (both L one step)
     // Phase qW: rewind tape1 L only (tape2 stays). On #→qK (tape1 R, tape2 S)
     // Phase qK: compare tape1 R, tape2 L. Match→stay. Both-exhausted→qA. Mismatch→qR.
-    // transitions: [
-    //   {from:'qC',to:'qC',rules:[{read:['0','B'],write:['0','0'],move:['R','R']}]},
-    //   {from:'qC',to:'qC',rules:[{read:['1','B'],write:['1','1'],move:['R','R']}]},
-    //   {from:'qC',to:'qW',rules:[{read:['B','B'],write:['B','B'],move:['L','L']}]},
-    //   {from:'qW',to:'qW',rules:[{read:['0','B'],write:['0','B'],move:['L','S']}]},
-    //   {from:'qW',to:'qW',rules:[{read:['1','B'],write:['1','B'],move:['L','S']}]},
-    //   {from:'qW',to:'qK',rules:[{read:['#','B'],write:['#','B'],move:['R','S']}]},
-    //   {from:'qK',to:'qK',rules:[{read:['0','0'],write:['0','0'],move:['R','L']}]},
-    //   {from:'qK',to:'qK',rules:[{read:['1','1'],write:['1','1'],move:['R','L']}]},
-    //   // {from:'qK',to:'qA',rules:[{read:['B','B'],write:['B','B'],move:['S','S']}]},
-    //   // {from:'qK',to:'qA',rules:[{read:['B','0'],write:['B','0'],move:['S','S']}]},
-    //   // {from:'qK',to:'qA',rules:[{read:['B','1'],write:['B','1'],move:['S','S']}]},
-    //   {from:'qK',to:'qR',rules:[{read:['0','1'],write:['0','1'],move:['S','S']}]},
-    //   {from:'qK',to:'qR',rules:[{read:['1','0'],write:['1','0'],move:['S','S']}]},
-
-    //   {from:'qK',to:'qA',rules:[{read:['B','B'],write:['B','B'],move:['S','S']}]},
-    // ]
 
     transitions: [
-      // ---------------- qC: COPY ----------------
+
+  // ---------------- qC: COPY ----------------
       {from:'qC',to:'qC',rules:[{read:['0','B'],write:['0','0'],move:['R','R']}]},
       {from:'qC',to:'qC',rules:[{read:['1','B'],write:['1','1'],move:['R','R']}]},
       {from:'qC',to:'qW',rules:[{read:['B','B'],write:['B','B'],move:['L','L']}]},
 
   // ---------------- qW: REWIND TAPE 1 ----------------
-  // Move left on tape1, ignore tape2 symbol
       {from:'qW',to:'qW',rules:[{read:['0','0'],write:['0','0'],move:['L','S']}]},
       {from:'qW',to:'qW',rules:[{read:['0','1'],write:['0','1'],move:['L','S']}]},
       {from:'qW',to:'qW',rules:[{read:['1','0'],write:['1','0'],move:['L','S']}]},
       {from:'qW',to:'qW',rules:[{read:['1','1'],write:['1','1'],move:['L','S']}]},
 
-  // When tape1 hits '#', start comparison
+  // move into compare phase
       {from:'qW',to:'qK',rules:[{read:['#','0'],write:['#','0'],move:['R','S']}]},
       {from:'qW',to:'qK',rules:[{read:['#','1'],write:['#','1'],move:['R','S']}]},
 
   // ---------------- qK: COMPARE ----------------
-  // Matching symbols → move inward
+
+  // match and move inward
       {from:'qK',to:'qK',rules:[{read:['0','0'],write:['0','0'],move:['R','L']}]},
       {from:'qK',to:'qK',rules:[{read:['1','1'],write:['1','1'],move:['R','L']}]},
 
-  // Accept ONLY when both exhausted
-      {from:'qK',to:'qA',rules:[{read:['B','B'],write:['B','B'],move:['S','S']}]},
-
-  // Mismatch → reject
+  // mismatch
       {from:'qK',to:'qR',rules:[{read:['0','1'],write:['0','1'],move:['S','S']}]},
       {from:'qK',to:'qR',rules:[{read:['1','0'],write:['1','0'],move:['S','S']}]},
+
+  // finish conditions (CRITICAL FIX)
+      {from:'qK',to:'qA',rules:[{read:['B','#'],write:['B','#'],move:['S','S']}]},
+      {from:'qK',to:'qA',rules:[{read:['B','B'],write:['B','B'],move:['S','S']}]},
+      {from:'qK',to:'qA',rules:[{read:['B','0'],write:['B','0'],move:['S','S']}]},
+      {from:'qK',to:'qA',rules:[{read:['B','1'],write:['B','1'],move:['S','S']}]},
+
   ]
   },
+
   increment: {
     tapes: 1, heads: 1,
     states: [
